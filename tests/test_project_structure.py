@@ -64,6 +64,60 @@ class ProjectStructureTests(unittest.TestCase):
         for directory in ["python_kiosk", "tests", "docs", "config", "scripts", "src"]:
             self.assertIn('"{0}"'.format(directory), script)
 
+    def test_modern_build_files_exist(self):
+        required = [
+            "requirements-modern-build.txt",
+            "RezhimKioska.Modern.spec",
+            "build_modern.ps1",
+        ]
+
+        missing = [
+            path for path in required
+            if not os.path.isfile(os.path.join(PROJECT_ROOT, path))
+        ]
+
+        self.assertEqual([], missing)
+
+    def test_modern_build_targets_separate_release_directory(self):
+        spec_path = os.path.join(PROJECT_ROOT, "RezhimKioska.Modern.spec")
+        script_path = os.path.join(PROJECT_ROOT, "build_modern.ps1")
+
+        with open(spec_path, "r", encoding="utf-8") as spec_file:
+            spec = spec_file.read()
+        with open(script_path, "r", encoding="utf-8") as script_file:
+            script = script_file.read()
+
+        self.assertIn('name="RezhimKioska-Modern"', spec)
+        self.assertIn('"modern"', script)
+        self.assertIn("requirements-modern-build.txt", script)
+        self.assertIn("unittest discover tests", script)
+        self.assertIn("Wheelhouse", script)
+        self.assertIn("--no-index", script)
+        self.assertNotIn("RezhimKioska-Legacy", script)
+
+    def test_modern_build_dependencies_are_fully_pinned(self):
+        requirements_path = os.path.join(
+            PROJECT_ROOT,
+            "requirements-modern-build.txt",
+        )
+
+        with open(requirements_path, "r", encoding="utf-8") as requirements_file:
+            rows = {
+                row.strip().lower()
+                for row in requirements_file
+                if row.strip() and not row.startswith("#")
+            }
+
+        expected = {
+            "pyinstaller==5.13.2",
+            "pyinstaller-hooks-contrib==2023.8",
+            "altgraph==0.17.4",
+            "pefile==2023.2.7",
+            "pywin32-ctypes==0.2.2",
+            "packaging==23.1",
+        }
+        self.assertEqual(expected, rows)
+
 
 if __name__ == "__main__":
     unittest.main()
