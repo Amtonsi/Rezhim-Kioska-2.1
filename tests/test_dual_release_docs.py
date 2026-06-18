@@ -55,6 +55,15 @@ class DualReleaseDocumentationTests(unittest.TestCase):
         self.assertIn("службы", testing)
         self.assertIn("автозагруз", testing)
 
+    def test_final_listing_describes_current_dual_release(self):
+        listing = read_text(os.path.join("docs", "FINAL_LISTING_RU.md"))
+
+        self.assertIn("RezhimKioska-Modern.exe", listing)
+        self.assertIn("RezhimKioska-Legacy.exe", listing)
+        self.assertIn("196 Modern", listing)
+        self.assertIn("84 Legacy", listing)
+        self.assertNotIn(r"dist\RezhimKioska.exe", listing)
+
 
 if __name__ == "__main__":
     unittest.main()
