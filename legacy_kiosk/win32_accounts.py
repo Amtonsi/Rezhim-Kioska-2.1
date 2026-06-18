@@ -125,6 +125,10 @@ class WindowsAccountBackend(object):
         self.advapi32.GetTokenInformation.restype = wintypes.BOOL
         self.advapi32.EqualSid.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
         self.advapi32.EqualSid.restype = wintypes.BOOL
+        self.advapi32.ImpersonateLoggedOnUser.argtypes = (wintypes.HANDLE,)
+        self.advapi32.ImpersonateLoggedOnUser.restype = wintypes.BOOL
+        self.advapi32.RevertToSelf.argtypes = ()
+        self.advapi32.RevertToSelf.restype = wintypes.BOOL
         self.kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
         self.kernel32.CloseHandle.restype = wintypes.BOOL
 
@@ -253,3 +257,12 @@ class WindowsAccountBackend(object):
         if handle:
             self.kernel32.CloseHandle(handle)
 
+    def impersonate(self, token):
+        if not self.advapi32.ImpersonateLoggedOnUser(token):
+            raise WindowsAuthError(
+                "ImpersonateLoggedOnUser", ctypes.get_last_error()
+            )
+
+    def revert_to_self(self):
+        if not self.advapi32.RevertToSelf():
+            raise WindowsAuthError("RevertToSelf", ctypes.get_last_error())

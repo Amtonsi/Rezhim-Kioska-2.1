@@ -45,6 +45,32 @@ class AuthResult(object):
         return data
 
 
+class AdminCredentialSession(object):
+    def __init__(self, backend, token, account_name):
+        self.backend = backend
+        self._token = token
+        self.account_name = account_name
+        self.closed = False
+
+    def run(self, callback):
+        if self.closed or self._token is None:
+            raise RuntimeError(u"Административная сессия уже закрыта.")
+        self.backend.impersonate(self._token)
+        try:
+            return callback()
+        finally:
+            self.backend.revert_to_self()
+
+    def close(self):
+        if self.closed:
+            return
+        token = self._token
+        self._token = None
+        self.closed = True
+        if token is not None:
+            self.backend.close_handle(token)
+
+
 def normalize_local_account_name(account_name):
     account_name = (account_name or u"").strip()
     if account_name.startswith(u".\\"):
@@ -93,6 +119,42 @@ class LocalAdminAuthenticator(object):
         self._log_result(result)
         return result
 
+    def begin_session(self, account_name, password):
+        local_name = normalize_local_account_name(account_name)
+        if not local_name or not password:
+            result = AuthResult(
+                AUTH_BAD_CREDENTIALS, MESSAGE_BAD_CREDENTIALS, local_name
+            )
+            self._log_result(result)
+            return result, None
+
+        token = None
+        keep_token = False
+        try:
+            token = self.backend.logon_local_user(local_name, password)
+            if not token:
+                result = AuthResult(
+                    AUTH_BAD_CREDENTIALS, MESSAGE_BAD_CREDENTIALS, local_name
+                )
+            elif not self.backend.token_is_local_admin(token):
+                result = AuthResult(AUTH_NOT_ADMIN, MESSAGE_NOT_ADMIN, local_name)
+            else:
+                result = AuthResult(AUTH_SUCCESS, u"Доступ разрешён.", local_name)
+                keep_token = True
+        except WindowsAuthError as error:
+            result = self._result_for_windows_error(local_name, error)
+        except Exception:
+            result = AuthResult(AUTH_WINDOWS_ERROR, MESSAGE_WINDOWS_ERROR, local_name)
+        finally:
+            password = None
+            if token is not None and not keep_token:
+                self.backend.close_handle(token)
+
+        self._log_result(result)
+        if not result.success:
+            return result, None
+        return result, AdminCredentialSession(self.backend, token, local_name)
+
     def _result_for_windows_error(self, account_name, error):
         if error.error_code == ERROR_ACCOUNT_DISABLED:
             return AuthResult(
@@ -122,4 +184,3 @@ class LocalAdminAuthenticator(object):
             self.logger.log("admin_authentication", result.to_log_data())
         except Exception:
             pass
-

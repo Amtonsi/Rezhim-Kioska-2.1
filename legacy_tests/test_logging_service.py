@@ -6,7 +6,11 @@ import shutil
 import tempfile
 import unittest
 
-from legacy_kiosk.logging_service import LegacyLogger, legacy_log_directory
+from legacy_kiosk.logging_service import (
+    LegacyLogger,
+    legacy_log_directory,
+    resolve_log_directory,
+)
 
 
 class LegacyLoggingTests(unittest.TestCase):
@@ -63,6 +67,24 @@ class LegacyLoggingTests(unittest.TestCase):
             r"C:\Documents and Settings\All Users\Application Data\Kiosk\Logs",
             result,
         )
+
+    def test_xp_translates_only_the_modern_default_log_directory(self):
+        environment = {
+            "ALLUSERSPROFILE": r"C:\Documents and Settings\All Users",
+        }
+
+        default_result = resolve_log_directory(
+            r"C:\ProgramData\Kiosk\Logs", environment=environment, nt_major=5
+        )
+        custom_result = resolve_log_directory(
+            r"D:\KioskLogs", environment=environment, nt_major=5
+        )
+
+        self.assertEqual(
+            r"C:\Documents and Settings\All Users\Application Data\Kiosk\Logs",
+            default_result,
+        )
+        self.assertEqual(r"D:\KioskLogs", custom_result)
 
 
 if __name__ == "__main__":

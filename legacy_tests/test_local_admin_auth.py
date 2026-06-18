@@ -49,6 +49,12 @@ class FakeAccountBackend(object):
     def close_handle(self, token):
         self.calls.append(("close", token))
 
+    def impersonate(self, token):
+        self.calls.append(("impersonate", token))
+
+    def revert_to_self(self):
+        self.calls.append(("revert",))
+
 
 class LegacyLocalAdminAuthTests(unittest.TestCase):
     def test_accepts_valid_local_administrator_and_closes_token(self):
@@ -197,6 +203,28 @@ class LegacyLocalAdminAuthTests(unittest.TestCase):
             ],
             backend.calls,
         )
+
+    def test_admin_session_retains_only_token_then_reverts_and_closes(self):
+        backend = FakeAccountBackend(token="admin-token", is_admin=True)
+        authenticator = LocalAdminAuthenticator(backend=backend)
+
+        result, session = authenticator.begin_session("Admin", "secret")
+
+        self.assertTrue(result.success)
+        self.assertNotIn(("close", "admin-token"), backend.calls)
+        self.assertEqual("saved", session.run(lambda: "saved"))
+        session.close()
+        self.assertEqual(
+            [
+                ("logon", "Admin", "secret"),
+                ("admin", "admin-token"),
+                ("impersonate", "admin-token"),
+                ("revert",),
+                ("close", "admin-token"),
+            ],
+            backend.calls,
+        )
+        self.assertNotIn("secret", repr(result.to_log_data()))
 
 
 if __name__ == "__main__":

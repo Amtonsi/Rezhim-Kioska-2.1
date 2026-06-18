@@ -62,6 +62,12 @@ class LegacyPlatformDetectionTests(unittest.TestCase):
         self.assertFalse(result.supported)
         self.assertIn(u"x86", result.message)
 
+    def test_modern_x64_windows_reports_wrong_build_not_only_architecture(self):
+        result = self._validate(10, 0, 0, architecture="x64")
+
+        self.assertFalse(result.supported)
+        self.assertIn(u"Windows XP SP1+", result.message)
+
     def test_detector_uses_native_version_and_architecture(self):
         api = FakePlatformApi((5, 2, 3790, 2, 3), architecture="x86")
 

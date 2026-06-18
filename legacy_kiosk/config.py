@@ -22,6 +22,50 @@ FORBIDDEN_CREDENTIAL_KEYS = frozenset(
 )
 
 
+def build_default_config():
+    return {
+        "operatorUser": "KioskOperator",
+        "allowedApplication": {
+            "path": r"C:\Windows\System32\notepad.exe",
+            "arguments": "",
+            "workingDirectory": r"C:\Windows\System32",
+            "restartOnExit": True,
+            "bringToFront": True,
+            "singleInstance": True,
+            "restoreIfMinimized": False,
+            "startMaximized": False,
+            "restartDelayMs": 2000,
+        },
+        "kiosk": {
+            "blockDesktop": True,
+            "disableStartMenu": True,
+            "disableExplorer": True,
+            "allowWinL": True,
+            "blockWinKey": True,
+            "adminSessionTimeoutSeconds": 300,
+        },
+        "logging": {
+            "logDirectory": r"C:\ProgramData\Kiosk\Logs",
+            "level": "Info",
+        },
+        "policyProfile": "xp_legacy",
+        "restartDelaySeconds": 2,
+        "restoreMetadata": {},
+        "featureFlags": {},
+        "testing": {
+            "requireBackupBeforeTest": True,
+            "restoreAfterTest": True,
+            "testOnlySeparateOperatorUser": True,
+        },
+    }
+
+
+def ensure_default_config(path):
+    if not os.path.exists(path):
+        save_config(build_default_config(), path)
+    return path
+
+
 def _normalized_key(key):
     if not isinstance(key, text_type):
         key = text_type(key)

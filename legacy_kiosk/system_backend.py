@@ -628,7 +628,7 @@ class LegacyInstallContext(object):
 
     @property
     def launcher_command(self):
-        return u'"%s" launch --config "%s"' % (
+        return u'"%s" --config "%s" launch' % (
             self.launcher_path,
             self.config_path,
         )

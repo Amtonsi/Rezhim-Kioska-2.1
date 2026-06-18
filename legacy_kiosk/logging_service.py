@@ -38,6 +38,23 @@ def legacy_log_directory(environment=None, nt_major=None):
     return os.path.join(program_data or r"C:\ProgramData", "Kiosk", "Logs")
 
 
+def resolve_log_directory(configured_path, environment=None, nt_major=None):
+    if nt_major is None:
+        try:
+            nt_major = int(sys.getwindowsversion()[0])
+        except Exception:
+            nt_major = 6
+    if not configured_path:
+        return legacy_log_directory(environment=environment, nt_major=nt_major)
+    modern_default = os.path.normcase(
+        os.path.normpath(r"C:\ProgramData\Kiosk\Logs")
+    )
+    configured = os.path.normcase(os.path.normpath(configured_path))
+    if int(nt_major) <= 5 and configured == modern_default:
+        return legacy_log_directory(environment=environment, nt_major=nt_major)
+    return configured_path
+
+
 def _normalized_key(key):
     if not isinstance(key, string_types):
         key = text_type(key)
@@ -124,4 +141,3 @@ class LegacyLogger(object):
             if os.path.exists(source):
                 os.rename(source, destination)
         os.rename(self.path, self.path + ".1")
-

@@ -130,13 +130,32 @@ def detect_windows_info(api=None):
 
 
 def validate_legacy_platform(info):
+    is_xp = (
+        info.major == 5
+        and info.minor == 1
+        and info.product_type == VER_NT_WORKSTATION
+    )
+    is_server_2003 = (
+        info.major == 5
+        and info.minor == 2
+        and info.product_type != VER_NT_WORKSTATION
+    )
+    if not is_xp and not is_server_2003:
+        return LegacyCompatibility(
+            False,
+            message=(
+                u"Эта Legacy-сборка предназначена только для Windows XP SP1+ "
+                u"и Windows Server 2003 x86."
+            ),
+        )
+
     if info.architecture != "x86":
         return LegacyCompatibility(
             False,
             message=u"Legacy-сборка поддерживает только 32-битную Windows x86.",
         )
 
-    if info.major == 5 and info.minor == 1 and info.product_type == VER_NT_WORKSTATION:
+    if is_xp:
         if info.service_pack_major < 1:
             return LegacyCompatibility(
                 False,
@@ -144,14 +163,5 @@ def validate_legacy_platform(info):
             )
         return LegacyCompatibility(True, profile="xp_legacy")
 
-    if info.major == 5 and info.minor == 2 and info.product_type != VER_NT_WORKSTATION:
+    if is_server_2003:
         return LegacyCompatibility(True, profile="server2003_legacy")
-
-    return LegacyCompatibility(
-        False,
-        message=(
-            u"Эта Legacy-сборка предназначена только для Windows XP SP1+ "
-            u"и Windows Server 2003 x86."
-        ),
-    )
-

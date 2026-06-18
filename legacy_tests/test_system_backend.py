@@ -199,6 +199,15 @@ class LegacySystemBackendTests(unittest.TestCase):
             backend.calls.index(("apply", "set_operator_shell")),
         )
 
+    def test_launcher_shell_command_places_global_config_before_subcommand(self):
+        context = self._context()
+
+        self.assertEqual(
+            u'"%s" --config "%s" launch'
+            % (self.launcher_path, self.config_path),
+            context.launcher_command,
+        )
+
     def test_transaction_rolls_back_completed_steps_in_reverse_order(self):
         backend = RecordingTransactionBackend(fail_on="apply_operator_policies")
 
