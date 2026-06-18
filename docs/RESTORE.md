@@ -1,5 +1,29 @@
 # Восстановление
 
+## Штатный Restore/Undo
+
+Восстановление запускается из административной УЗ, не из оператора. Сначала выполните dry-run, затем `--apply`.
+
+Modern:
+
+```powershell
+.\RezhimKioska-Modern.exe restore --config .\config\kiosk.json
+.\RezhimKioska-Modern.exe restore --config .\config\kiosk.json --apply
+.\RezhimKioska-Modern.exe recover-desktop
+```
+
+Legacy:
+
+```cmd
+RezhimKioska-Legacy.exe --config .\config\kiosk.json restore
+RezhimKioska-Legacy.exe --config .\config\kiosk.json restore --apply
+RezhimKioska-Legacy.exe --config .\config\kiosk.json recover-desktop
+```
+
+Legacy Restore/Undo читает `backup\legacy-backup.json`, проверяет семейство сборки и SID оператора, точно возвращает записанные значения реестра и DACL. Он не зависит от запущенной оболочки. После восстановления выполните выход из операторской УЗ и новый вход: должен стартовать `explorer.exe`, а Пуск и панель задач должны работать обычно.
+
+Если штатный EXE недоступен, войдите в другую административную УЗ и вручную верните для SID оператора значение `HKU\<SID>\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell` в `explorer.exe`, затем удалите только политики, перечисленные в backup. Не меняйте HKCU основной УЗ и не удаляйте чужие значения политик.
+
 Restore выполняется из обычной административной учетной записи Windows. Не нужно входить в операторскую учетную запись и не нужно, чтобы KioskLauncher был запущен.
 
 ## Dry-run

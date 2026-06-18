@@ -1,5 +1,18 @@
 # Режим киоска
 
+## Выбор загрузчика
+
+Выберите файл вручную по версии Windows: автоматического селектора и третьего загрузчика нет.
+
+```text
+XP SP1-SP3 / Server 2003 x86 -> release\legacy\RezhimKioska-Legacy.exe
+Windows 7 SP1-11             -> release\modern\RezhimKioska-Modern.exe
+```
+
+Оба файла используют внешний `config\kiosk.json` рядом с EXE и запускают только указанный там обычный Win32 `.exe`. Modern и Legacy собраны независимо: Legacy-код не импортирует Modern-код, поэтому поддержка старых Windows не изменяет работающую Modern-оболочку.
+
+Текущий статус платформ приведён в [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). XP/Server 2003 пока являются целевыми, но не подтверждёнными на snapshot-VM платформами; универсальная готовность до такой проверки не заявляется.
+
 **Режим киоска** — Python-оболочка для отдельной операторской учётной записи Windows. Она запускается вместо `explorer.exe`, блокирует обычный рабочий стол оператора и держит запущенным только одно разрешённое Win32-приложение из `config/kiosk.json`.
 
 Проект не останавливает службы Windows, драйверы, системные процессы и существующую автозагрузку. Ограничения применяются только к отдельной операторской УЗ.
@@ -115,21 +128,25 @@ Dry-run:
 
 ## Совместимость
 
-Архитектура содержит профили `xp_legacy`, `win7_srp`, `win10_applocker`, `win10_shelllauncher`, `home_fallback`. Home-редакции используют fallback с пониженной гарантией. Текущий exe, собранный Python 3.14, не является XP-совместимым; для XP нужна отдельная legacy-сборка старым Python/PyInstaller.
+Архитектура содержит профили `xp_legacy`, `win7_srp`, `win10_applocker`, `win10_shelllauncher`, `home_fallback`. Home-редакции используют fallback с пониженной гарантией. Для XP/Server 2003 используется отдельный Legacy EXE на Python 2.7 x86; Modern EXE на старых системах не запускается.
 
 ## Сборка
 
+Сначала отдельно соберите и проверьте Modern и Legacy, затем запустите упаковщик:
+
 ```powershell
-python -m pip install -r requirements-build.txt
+.\build_modern.ps1
+cmd /c build_legacy.cmd
 .\build_release.ps1
 ```
 
 Результаты:
 
-- `dist\RezhimKioska.exe`;
-- `release\RezhimKioska.exe`;
-- `release\config\kiosk.json`;
-- `release\PythonKiosk-GitHub.zip`.
+- `release\modern\RezhimKioska-Modern.exe`;
+- `release\legacy\RezhimKioska-Legacy.exe`;
+- `release\package\PythonKiosk-GitHub.zip`;
+- `release\package\SHA256SUMS.txt`;
+- `release\package\build-manifest.json`.
 
 ## Обновление 2026-06-16: горячие клавиши и один экземпляр приложения
 

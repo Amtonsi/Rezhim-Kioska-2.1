@@ -1,5 +1,42 @@
 # Установка
 
+## Два независимых EXE
+
+```text
+XP SP1-SP3 / Server 2003 x86 -> release\legacy\RezhimKioska-Legacy.exe
+Windows 7 SP1-11             -> release\modern\RezhimKioska-Modern.exe
+```
+
+Установка выполняется из обычной административной УЗ Windows. Оператор должен быть отдельным локальным пользователем без членства в `Administrators`; основную УЗ не указывайте. На XP/Server 2003 создайте оператора штатными средствами Windows, войдите в него один раз для создания `NTUSER.DAT`, затем вернитесь в административную УЗ.
+
+Сначала измените `config\kiosk.json`: `operatorUser`, путь `allowedApplication.path` и `workingDirectory`. Можно выбрать любой существующий обычный `.exe`; UWP/Store не поддерживается.
+
+Modern, dry-run и применение:
+
+```powershell
+.\RezhimKioska-Modern.exe install --config .\config\kiosk.json
+.\RezhimKioska-Modern.exe install --config .\config\kiosk.json --apply
+```
+
+Legacy, dry-run и применение:
+
+```cmd
+RezhimKioska-Legacy.exe --config .\config\kiosk.json install
+RezhimKioska-Legacy.exe --config .\config\kiosk.json install --apply
+```
+
+Для смены разрешённого приложения без ручного редактирования:
+
+```powershell
+.\RezhimKioska-Modern.exe set-app --config .\config\kiosk.json --app-path "C:\Path\App.exe"
+```
+
+```cmd
+RezhimKioska-Legacy.exe --config .\config\kiosk.json set-app "C:\Path\App.exe"
+```
+
+`--apply` требует повышенных прав. До записи shell выполняются проверка платформы, оператора, пути EXE и backup. Shell оператора записывается последним; при ошибке уже выполненные операции откатываются.
+
 Установка должна выполняться только из обычной административной учетной записи Windows. Основную учетную запись пользователя не используйте как оператора.
 
 ## 1. Создать оператора
