@@ -14,7 +14,11 @@ from python_kiosk.config import (
 )
 from python_kiosk.configurator import Configurator
 from python_kiosk.launcher import KioskLauncher
-from python_kiosk.platform_detect import detect_windows_info, select_policy_profile
+from python_kiosk.platform_detect import (
+    detect_windows_info,
+    select_policy_profile,
+    validate_modern_platform,
+)
 from python_kiosk.policy_plan import build_install_plan, build_restore_plan
 from python_kiosk.restore_tool import RestoreTool
 from python_kiosk.security import hash_password
@@ -257,10 +261,19 @@ def _load_config_for_command(path):
     return load_config(path, create_if_missing=True)
 
 
-def main(argv=None, stdout=None, shell_runner=None):
+def main(
+    argv=None,
+    stdout=None,
+    shell_runner=None,
+    platform_detector=None,
+    enforce_platform=None,
+):
     argv = sys.argv[1:] if argv is None else list(argv)
     stdout = stdout or print
     shell_runner = shell_runner or run_shell
+    platform_detector = platform_detector or detect_windows_info
+    if enforce_platform is None:
+        enforce_platform = bool(getattr(sys, "frozen", False))
     parser = build_parser()
 
     if not argv:
@@ -272,6 +285,19 @@ def main(argv=None, stdout=None, shell_runner=None):
         _emit(stdout, str(error))
         _emit(stdout, parser.format_help())
         return 2
+
+    guarded_commands = {
+        "install",
+        "restore",
+        "launch",
+        "set-app",
+        "change-password",
+    }
+    if enforce_platform and args.command in guarded_commands:
+        compatibility = validate_modern_platform(platform_detector())
+        if not compatibility.supported:
+            _emit(stdout, compatibility.message)
+            return 2
 
     if args.command == "init":
         config = _create_config(args)

@@ -12,10 +12,50 @@ from unittest import mock
 import main
 from python_kiosk.config import load_config, save_config
 from python_kiosk.logging_service import configured_log_path
+from python_kiosk.platform_detect import WindowsInfo
 from python_kiosk.system_backend import ADMIN_RIGHTS_REQUIRED_MESSAGE
 
 
 class CliTests(unittest.TestCase):
+    def test_modern_guard_rejects_xp_before_launch(self):
+        output = []
+        shell_calls = []
+        info = WindowsInfo(
+            5,
+            1,
+            2600,
+            "Professional",
+            service_pack_major=3,
+        )
+
+        code = main.main(
+            ["launch", "--config", os.path.join(tempfile.mkdtemp(), "missing.json")],
+            stdout=output.append,
+            shell_runner=lambda launcher: shell_calls.append(launcher),
+            platform_detector=lambda: info,
+            enforce_platform=True,
+        )
+
+        self.assertEqual(2, code)
+        self.assertEqual([], shell_calls)
+        self.assertIn("Legacy", "\n".join(output))
+
+    def test_modern_guard_rejects_server_before_install(self):
+        output = []
+        info = WindowsInfo(10, 0, 20348, "Server", product_type=3)
+
+        with mock.patch.object(main, "Configurator") as configurator:
+            code = main.main(
+                ["install", "--config", os.path.join(tempfile.mkdtemp(), "missing.json")],
+                stdout=output.append,
+                platform_detector=lambda: info,
+                enforce_platform=True,
+            )
+
+        self.assertEqual(2, code)
+        configurator.assert_not_called()
+        self.assertIn("Windows Server", "\n".join(output))
+
     def test_frozen_default_config_resolves_to_persistent_path_next_to_exe(self):
         temp_dir = tempfile.mkdtemp()
         bundle_dir = os.path.join(temp_dir, "bundle")
