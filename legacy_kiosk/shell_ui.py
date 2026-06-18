@@ -275,7 +275,7 @@ def build_shell_layout(
                 ),
                 _text(
                     "minimized_alert_text",
-                    u"Приложение свёрнуто",
+                    u"Приложение свернуто",
                     158,
                     567,
                     440,

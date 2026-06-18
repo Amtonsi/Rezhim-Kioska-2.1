@@ -1,0 +1,19 @@
+{
+  "families": {
+    "legacy": [
+      "operatorSid",
+      "registry",
+      "security"
+    ],
+    "modern": [
+      "plan"
+    ]
+  },
+  "requiredCommonFields": [
+    "schemaVersion",
+    "buildFamily",
+    "operatorUser",
+    "originalShell"
+  ],
+  "schemaVersion": 1
+}

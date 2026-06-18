@@ -124,7 +124,7 @@ class LegacyShellUiTests(unittest.TestCase):
         items = self._items(app_status="minimized")
 
         self.assertEqual(
-            u"Приложение свёрнуто", items["minimized_alert_text"]["text"]
+            u"Приложение свернуто", items["minimized_alert_text"]["text"]
         )
         self.assertEqual(
             u"Развернуть приложение", items["restore_app_button_text"]["text"]

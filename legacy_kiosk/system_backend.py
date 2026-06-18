@@ -834,6 +834,12 @@ class LegacySystemBackend(object):
                 "productType": platform.product_type,
                 "architecture": platform.architecture,
             }
+        original_shell = None
+        for record in registry_records:
+            if record.get("group") == "shell":
+                if record.get("exists"):
+                    original_shell = record.get("data")
+                break
         self.backup_store.save(
             context.backup_path,
             {
@@ -842,6 +848,7 @@ class LegacySystemBackend(object):
                 "createdUnixTime": int(time.time()),
                 "operatorSid": context.operator_sid,
                 "operatorUser": context.operator_user,
+                "originalShell": original_shell,
                 "os": os_data,
                 "registry": registry_records,
                 "security": security_records,

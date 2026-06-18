@@ -36,6 +36,10 @@ class BackupStore(object):
         filename = "backup-{0}.json".format(time.strftime("%Y%m%d-%H%M%S"))
         path = os.path.join(directory, filename)
         data = {
+            "schemaVersion": 1,
+            "buildFamily": "modern",
+            "operatorUser": config.operator_user,
+            "originalShell": "explorer.exe",
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "operator_user": config.operator_user,
             "app_path": config.app_path,

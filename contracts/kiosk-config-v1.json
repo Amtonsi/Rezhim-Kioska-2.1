@@ -1,0 +1,36 @@
+{
+  "allowedApplication": {
+    "arguments": "",
+    "bringExistingToFront": true,
+    "bringToFront": true,
+    "path": "C:\\Windows\\System32\\notepad.exe",
+    "restartDelayMs": 2000,
+    "restartOnExit": true,
+    "restoreIfMinimized": false,
+    "singleInstance": true,
+    "startMaximized": false,
+    "workingDirectory": "C:\\Windows\\System32"
+  },
+  "featureFlags": {},
+  "kiosk": {
+    "adminSessionTimeoutSeconds": 300,
+    "allowWinL": true,
+    "blockDesktop": true,
+    "blockWinKey": true,
+    "disableExplorer": true,
+    "disableStartMenu": true
+  },
+  "logging": {
+    "level": "Info",
+    "logDirectory": "C:\\ProgramData\\Kiosk\\Logs"
+  },
+  "operatorUser": "KioskOperator",
+  "policyProfile": "auto",
+  "restartDelaySeconds": 2,
+  "restoreMetadata": {},
+  "testing": {
+    "requireBackupBeforeTest": true,
+    "restoreAfterTest": true,
+    "testOnlySeparateOperatorUser": true
+  }
+}
