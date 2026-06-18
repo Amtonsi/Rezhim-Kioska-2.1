@@ -280,6 +280,21 @@ class FakeAppWindowController(object):
 
 
 class ShellWindowTests(unittest.TestCase):
+    def test_header_matches_compact_brand_reference(self):
+        layout = build_shell_layout(r"C:\Program Files\Vendor\App\VendorApp.exe")
+        by_name = dict((item["name"], item) for item in layout)
+
+        self.assertEqual("РК", by_name["header_mark_text"]["text"])
+        self.assertEqual("Режим киоска", by_name["header_title"]["text"])
+        self.assertEqual("2026", by_name["header_year_text"]["text"])
+        self.assertEqual((48, 34, 38, 38, 8), by_name["header_mark"]["rect"])
+        self.assertEqual((276, 29, 62, 48, 12), by_name["header_year_badge"]["rect"])
+        badge_bottom = (
+            by_name["header_year_badge"]["rect"][1]
+            + by_name["header_year_badge"]["rect"][3]
+        )
+        self.assertLess(badge_bottom, by_name["header_subtitle"]["rect"][1])
+
     def test_shell_layout_matches_approved_mockup_structure(self):
         layout = build_shell_layout(r"C:\Program Files\Vendor\App\VendorApp.exe")
         by_name = dict((item["name"], item) for item in layout)
