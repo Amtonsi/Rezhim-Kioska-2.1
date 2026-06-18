@@ -1,0 +1,12 @@
+{
+  "admin_password_algorithm": "pbkdf2_hmac_sha256",
+  "admin_password_hash": "45b368b5750e79458631f0feb28d8875aa6b5afba4e9abafa3df80ad6fa5ec05",
+  "admin_password_iterations": 200000,
+  "admin_password_salt": "ed1d688a83255fc47036d9ddcf271392",
+  "app_path": "C:\\Windows\\System32\\notepad.exe",
+  "feature_flags": {},
+  "operator_user": "Operator",
+  "policy_profile": "auto",
+  "restart_delay_seconds": 2,
+  "restore_metadata": {}
+}

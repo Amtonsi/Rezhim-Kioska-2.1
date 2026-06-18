@@ -1,0 +1,2 @@
+"""PythonKiosk package."""
+

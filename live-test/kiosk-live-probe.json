@@ -1,0 +1,37 @@
+﻿{
+    "operatorUser":  "impal",
+    "allowedApplication":  {
+                               "path":  "C:\\Users\\impal\\PycharmProjects\\PythonKiosk\\.venv\\Scripts\\pythonw.exe",
+                               "arguments":  "\"C:\\Users\\impal\\PycharmProjects\\PythonKiosk\\live-test\\keyboard_probe.py\" \"C:\\Users\\impal\\PycharmProjects\\PythonKiosk\\live-test\\keyboard_probe_capture.txt\"",
+                               "workingDirectory":  "C:\\Users\\impal\\PycharmProjects\\PythonKiosk",
+                               "restartOnExit":  true,
+                               "bringToFront":  true,
+                               "bringExistingToFront":  true,
+                               "startMaximized":  false,
+                               "restoreIfMinimized":  false,
+                               "singleInstance":  true,
+                               "restartDelayMs":  2000
+                           },
+    "kiosk":  {
+                  "blockDesktop":  true,
+                  "disableStartMenu":  true,
+                  "disableExplorer":  true,
+                  "allowWinL":  true,
+                  "blockWinKey":  true,
+                  "adminSessionTimeoutSeconds":  300
+              },
+    "logging":  {
+                    "logDirectory":  "C:\\Users\\impal\\PycharmProjects\\PythonKiosk\\live-test\\logs",
+                    "level":  "Info"
+                },
+    "policyProfile":  "auto",
+    "restartDelaySeconds":  2,
+    "restoreMetadata":  {
+
+                        },
+    "testing":  {
+                    "requireBackupBeforeTest":  true,
+                    "restoreAfterTest":  true,
+                    "testOnlySeparateOperatorUser":  true
+                }
+}

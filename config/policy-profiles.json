@@ -1,0 +1,22 @@
+{
+  "home_fallback": {
+    "description": "Замена shell и пользовательские ограничения реестра. Для Home-редакций уровень защиты ниже.",
+    "mechanisms": ["operator_shell", "hkcu_policies"]
+  },
+  "win10_applocker": {
+    "description": "Замена shell и подготовка AppLocker там, где доступно принудительное применение.",
+    "mechanisms": ["operator_shell", "hkcu_policies", "applocker"]
+  },
+  "win10_shelllauncher": {
+    "description": "Замена shell и подготовка Shell Launcher для Enterprise/Education/IoT.",
+    "mechanisms": ["operator_shell", "hkcu_policies", "shelllauncher"]
+  },
+  "win7_srp": {
+    "description": "Замена shell и подготовка Software Restriction Policies.",
+    "mechanisms": ["operator_shell", "hkcu_policies", "srp"]
+  },
+  "xp_legacy": {
+    "description": "Совместимая с XP замена shell и legacy-ограничения реестра.",
+    "mechanisms": ["operator_shell", "hkcu_policies"]
+  }
+}
