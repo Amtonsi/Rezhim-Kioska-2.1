@@ -22,4 +22,4 @@ Windows XP без SP и Windows 2000 не поддерживаются. Legacy �
 
 Home-редакции используют `home_fallback`: shell replacement и пользовательские registry policies не дают гарантий уровня Enterprise. Профили AppLocker/Shell Launcher применимы только там, где функция реально доступна редакции Windows.
 
-На текущем доступном Windows 11 выполнены 184 Modern unit/regression-теста до добавления cross-contract tests, 81 Legacy-тест до добавления cross-contract tests, сборка PE32 Legacy и безопасный wrong-platform smoke. Финальные числа фиксируются итоговым прогоном.
+На текущем доступном Windows 11 пройдены 195 Modern unit/regression-тестов и 84 Legacy-теста. Оба EXE проверены как PE32/x86; Legacy дополнительно прошел безопасный wrong-platform smoke с кодом выхода 3 и без изменения shell.
