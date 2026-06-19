@@ -16,6 +16,8 @@ class ApplicationSettings(object):
         "restart_on_exit",
         "restart_delay_ms",
         "single_instance",
+        "max_restart_attempts",
+        "restart_window_seconds",
     )
 
     def __init__(
@@ -26,6 +28,8 @@ class ApplicationSettings(object):
         restart_on_exit=True,
         restart_delay_ms=2000,
         single_instance=True,
+        max_restart_attempts=5,
+        restart_window_seconds=30,
     ):
         self.path = path
         normalize_executable_path(path)
@@ -38,6 +42,12 @@ class ApplicationSettings(object):
         if self.restart_delay_ms < 0:
             raise ValueError("Restart delay cannot be negative")
         self.single_instance = bool(single_instance)
+        self.max_restart_attempts = int(max_restart_attempts)
+        if self.max_restart_attempts < 1:
+            raise ValueError("Maximum restart attempts must be positive")
+        self.restart_window_seconds = float(restart_window_seconds)
+        if self.restart_window_seconds <= 0:
+            raise ValueError("Restart window must be positive")
 
 
 class ProcessRef(object):
@@ -56,6 +66,7 @@ class SupervisorResult(object):
         "error_code",
         "conflict_pids",
         "previous_pid",
+        "failure_count",
     )
 
     def __init__(
@@ -65,12 +76,14 @@ class SupervisorResult(object):
         error_code=None,
         conflict_pids=(),
         previous_pid=None,
+        failure_count=0,
     ):
         self.status = status
         self.pid = pid
         self.error_code = error_code
         self.conflict_pids = tuple(conflict_pids)
         self.previous_pid = previous_pid
+        self.failure_count = int(failure_count)
 
 
 class ProcessSupervisor(object):
@@ -82,6 +95,9 @@ class ProcessSupervisor(object):
         self._pid = None
         self._restart_due_at = None
         self._conflict_pids = ()
+        self._failure_times = []
+        self._breaker_open = False
+        self._tracked_since = None
 
     @property
     def pid(self):
@@ -93,12 +109,18 @@ class ProcessSupervisor(object):
 
     def start(self):
         if self._enabled and self._tracked_process_is_running():
-            return SupervisorResult("running", pid=self._pid)
+            self._clear_failures_after_stable_run()
+            return SupervisorResult(
+                "running",
+                pid=self._pid,
+                failure_count=len(self._failure_times),
+            )
 
         self._enabled = True
         self._pid = None
         self._restart_due_at = None
         self._conflict_pids = ()
+        self._reset_breaker()
         discovery = self._discover_existing()
         if discovery is not None:
             return discovery
@@ -108,8 +130,19 @@ class ProcessSupervisor(object):
         if not self._enabled:
             return SupervisorResult("stopped")
 
+        if self._breaker_open:
+            return SupervisorResult(
+                "crash_loop",
+                failure_count=len(self._failure_times),
+            )
+
         if self._tracked_process_is_running():
-            return SupervisorResult("running", pid=self._pid)
+            self._clear_failures_after_stable_run()
+            return SupervisorResult(
+                "running",
+                pid=self._pid,
+                failure_count=len(self._failure_times),
+            )
 
         previous_pid = self._pid
         self._pid = None
@@ -122,7 +155,19 @@ class ProcessSupervisor(object):
         if previous_pid is not None and not self.settings.restart_on_exit:
             self._enabled = False
             self._restart_due_at = None
+            self._tracked_since = None
             return SupervisorResult("stopped", previous_pid=previous_pid)
+
+        if previous_pid is not None:
+            self._clear_failures_after_stable_run()
+            self._record_failure()
+            self._tracked_since = None
+            if self._breaker_open:
+                return SupervisorResult(
+                    "crash_loop",
+                    previous_pid=previous_pid,
+                    failure_count=len(self._failure_times),
+                )
 
         if self._restart_due_at is None:
             self._restart_due_at = self._now() + self._restart_delay_seconds()
@@ -131,6 +176,7 @@ class ProcessSupervisor(object):
             return SupervisorResult(
                 "waiting_restart",
                 previous_pid=previous_pid,
+                failure_count=len(self._failure_times),
             )
 
         return self._launch("restarted", previous_pid=previous_pid)
@@ -141,7 +187,13 @@ class ProcessSupervisor(object):
         self._pid = None
         self._restart_due_at = None
         self._conflict_pids = ()
-        return SupervisorResult("stopped", previous_pid=previous_pid)
+        self._tracked_since = None
+        self._reset_breaker()
+        return SupervisorResult(
+            "stopped",
+            previous_pid=previous_pid,
+            failure_count=0,
+        )
 
     def _discover_existing(self):
         expected = normalize_executable_path(self.settings.path)
@@ -164,11 +216,17 @@ class ProcessSupervisor(object):
             return SupervisorResult(
                 "conflict",
                 conflict_pids=self._conflict_pids,
+                failure_count=len(self._failure_times),
             )
         if candidates:
             self._pid = candidates[0].pid
             self._conflict_pids = ()
-            return SupervisorResult("adopted", pid=self._pid)
+            self._tracked_since = self._now()
+            return SupervisorResult(
+                "adopted",
+                pid=self._pid,
+                failure_count=len(self._failure_times),
+            )
         self._conflict_pids = ()
         return None
 
@@ -189,21 +247,55 @@ class ProcessSupervisor(object):
                 raise RuntimeError("Started process is not running")
         except Exception as error:
             self._pid = None
+            self._tracked_since = None
+            self._record_failure()
+            if self._breaker_open:
+                self._restart_due_at = None
+                return SupervisorResult(
+                    "crash_loop",
+                    error_code=error.__class__.__name__,
+                    previous_pid=previous_pid,
+                    failure_count=len(self._failure_times),
+                )
             self._restart_due_at = self._now() + self._restart_delay_seconds()
             return SupervisorResult(
                 "start_failed",
                 error_code=error.__class__.__name__,
                 previous_pid=previous_pid,
+                failure_count=len(self._failure_times),
             )
 
         self._pid = process.pid
         self._restart_due_at = None
         self._conflict_pids = ()
+        self._tracked_since = self._now()
         return SupervisorResult(
             success_status,
             pid=self._pid,
             previous_pid=previous_pid,
+            failure_count=len(self._failure_times),
         )
+
+    def _record_failure(self):
+        now = self._now()
+        oldest = now - self.settings.restart_window_seconds
+        self._failure_times = [
+            value for value in self._failure_times if value >= oldest
+        ]
+        self._failure_times.append(now)
+        if len(self._failure_times) >= self.settings.max_restart_attempts:
+            self._breaker_open = True
+
+    def _clear_failures_after_stable_run(self):
+        if self._tracked_since is None:
+            return
+        if self._now() - self._tracked_since >= self.settings.restart_window_seconds:
+            self._failure_times = []
+            self._breaker_open = False
+
+    def _reset_breaker(self):
+        self._failure_times = []
+        self._breaker_open = False
 
     def _now(self):
         return float(self.clock.monotonic())

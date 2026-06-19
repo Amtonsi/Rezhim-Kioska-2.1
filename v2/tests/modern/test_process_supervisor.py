@@ -30,6 +30,8 @@ def settings(**overrides):
         "restart_on_exit": True,
         "restart_delay_ms": 2000,
         "single_instance": True,
+        "max_restart_attempts": 5,
+        "restart_window_seconds": 30,
     }
     values.update(overrides)
     return ApplicationSettings(**values)
@@ -210,6 +212,108 @@ class ProcessSupervisorTests(unittest.TestCase):
         self.assertEqual("waiting_restart", result.status)
         self.assertIsNone(result.pid)
         self.assertEqual(10, result.previous_pid)
+
+    def test_rapid_exits_open_circuit_and_prevent_further_launch(self):
+        clock = FakeClock(0.0)
+        api = FakeProcessApi(existing=[])
+        supervisor = ProcessSupervisor(
+            settings(
+                restart_delay_ms=100,
+                max_restart_attempts=2,
+                restart_window_seconds=10,
+            ),
+            api,
+            clock,
+        )
+        first = supervisor.start()
+        api.running[first.pid] = False
+        self.assertEqual("waiting_restart", supervisor.tick().status)
+        clock.value = 0.2
+        second = supervisor.tick()
+        api.running[second.pid] = False
+
+        crash_loop = supervisor.tick()
+        clock.value = 100.0
+        still_blocked = supervisor.tick()
+
+        self.assertEqual("crash_loop", crash_loop.status)
+        self.assertEqual(2, crash_loop.failure_count)
+        self.assertEqual("crash_loop", still_blocked.status)
+        self.assertEqual(2, len(api.start_calls))
+
+    def test_repeated_launch_failures_open_circuit_without_tight_loop(self):
+        clock = FakeClock(0.0)
+        api = FakeProcessApi(existing=[])
+        api.start_errors.extend([OSError("first"), OSError("second")])
+        supervisor = ProcessSupervisor(
+            settings(
+                restart_delay_ms=100,
+                max_restart_attempts=2,
+                restart_window_seconds=10,
+            ),
+            api,
+            clock,
+        )
+
+        first = supervisor.start()
+        clock.value = 0.2
+        second = supervisor.tick()
+        clock.value = 20.0
+        third = supervisor.tick()
+
+        self.assertEqual("start_failed", first.status)
+        self.assertEqual("crash_loop", second.status)
+        self.assertEqual("crash_loop", third.status)
+        self.assertEqual(2, len(api.start_calls))
+
+    def test_stable_run_clears_old_failure_before_next_exit(self):
+        clock = FakeClock(0.0)
+        api = FakeProcessApi(existing=[])
+        supervisor = ProcessSupervisor(
+            settings(
+                restart_delay_ms=100,
+                max_restart_attempts=2,
+                restart_window_seconds=5,
+            ),
+            api,
+            clock,
+        )
+        first = supervisor.start()
+        api.running[first.pid] = False
+        supervisor.tick()
+        clock.value = 0.2
+        second = supervisor.tick()
+        clock.value = 6.0
+        self.assertEqual("running", supervisor.tick().status)
+        api.running[second.pid] = False
+
+        result = supervisor.tick()
+
+        self.assertEqual("waiting_restart", result.status)
+        self.assertEqual(1, result.failure_count)
+
+    def test_restart_supervision_resets_open_circuit_without_termination(self):
+        clock = FakeClock(0.0)
+        api = FakeProcessApi(existing=[])
+        supervisor = ProcessSupervisor(
+            settings(
+                restart_delay_ms=100,
+                max_restart_attempts=1,
+                restart_window_seconds=10,
+            ),
+            api,
+            clock,
+        )
+        first = supervisor.start()
+        api.running[first.pid] = False
+        self.assertEqual("crash_loop", supervisor.tick().status)
+
+        supervisor.stop_supervision()
+        resumed = supervisor.start()
+
+        self.assertEqual("started", resumed.status)
+        self.assertEqual(0, resumed.failure_count)
+        self.assertEqual([], api.terminate_calls)
 
 
 if __name__ == "__main__":

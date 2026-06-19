@@ -8,6 +8,7 @@ class ApplicationRuntimeResult(object):
         "window_status",
         "error_code",
         "conflict_pids",
+        "failure_count",
     )
 
     def __init__(
@@ -17,12 +18,14 @@ class ApplicationRuntimeResult(object):
         window_status="no_window",
         error_code=None,
         conflict_pids=(),
+        failure_count=0,
     ):
         self.process_status = process_status
         self.pid = pid
         self.window_status = window_status
         self.error_code = error_code
         self.conflict_pids = tuple(conflict_pids)
+        self.failure_count = int(failure_count)
 
 
 class ApplicationRuntime(object):
@@ -120,4 +123,5 @@ class ApplicationRuntime(object):
             window_status=window_status,
             error_code=process.error_code,
             conflict_pids=process.conflict_pids,
+            failure_count=process.failure_count,
         )

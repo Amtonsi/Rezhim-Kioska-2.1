@@ -49,14 +49,14 @@ types, never passwords, typed text, tokens, or command arguments.
 - Modify: `v2/tests/modern/test_process_supervisor.py`
 - Modify: `v2/tests/contracts/test_contract_documents.py`
 
-- [ ] Add required `maxRestartAttempts` and `restartWindowSeconds` fields with
+- [x] Add required `maxRestartAttempts` and `restartWindowSeconds` fields with
   conservative limits and future migration defaults.
-- [ ] Write RED tests where rapid exits or launch failures reach `crash_loop`, no
+- [x] Write RED tests where rapid exits or launch failures reach `crash_loop`, no
   additional process is opened, a stable run clears old failures, and explicitly
   restarting supervision clears the breaker without terminating a process.
-- [ ] Implement a monotonic rolling-window failure counter. Never log or expose
+- [x] Implement a monotonic rolling-window failure counter. Never log or expose
   process arguments in results.
-- [ ] Run targeted and full V2 tests, then commit.
+- [x] Run targeted and full V2 tests, then commit.
 
 ### Task 4: Rate-limited administrator authentication
 

@@ -31,6 +31,9 @@ class ContractDocumentTests(unittest.TestCase):
         )
         for forbidden in ("password", "credential", "token", "secret"):
             self.assertNotIn(forbidden, text)
+        allowed = schema["properties"]["allowedApplication"]
+        self.assertIn("maxRestartAttempts", allowed["required"])
+        self.assertIn("restartWindowSeconds", allowed["required"])
 
     def test_backup_schema_binds_build_operator_and_original_shell(self):
         schema = load("backup-v2.schema.json")
