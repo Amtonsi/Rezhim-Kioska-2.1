@@ -35,15 +35,15 @@ change real permissions.
 - Create: `v2/modern/kiosk_v2_modern/app/config_repository.py`
 - Create: `v2/tests/modern/test_config_repository.py`
 
-- [ ] Write RED tests for valid default, UTF-8 BOM input, unknown fields, wrong
+- [x] Write RED tests for valid default, UTF-8 BOM input, unknown fields, wrong
   booleans/ranges, non-absolute executable paths, and a missing executable when
   `require_existing_app=True`.
-- [ ] Write failure-injection tests proving `save()` flushes and atomically replaces
+- [x] Write failure-injection tests proving `save()` flushes and atomically replaces
   only after validation, preserves the old target when replace fails, removes temp
   files, and invokes the ACL port only after a successful replace.
-- [ ] Implement `ConfigValidationError`, pure recursive validation, deep-copy load,
+- [x] Implement `ConfigValidationError`, pure recursive validation, deep-copy load,
   and `ConfigRepository`. Never import V1 modules.
-- [ ] Run targeted tests on Python 3.8 x86 and commit.
+- [x] Run targeted tests on Python 3.8 x86 and commit.
 
 ### Task 3: Allowlisted V1-to-V2 migration
 
