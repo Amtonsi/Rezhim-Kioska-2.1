@@ -23,12 +23,12 @@ compatibility until an XP SP1 VM smoke test passes.
 - Create: `v2/legacy/kiosk_v2_legacy/platform/clock.py`
 - Create: `v2/tests/legacy/test_process_supervisor.py`
 
-- [ ] Write Python-2-compatible RED tests for adopt, one launch, delayed restart,
+- [x] Write Python-2-compatible RED tests for adopt, one launch, delayed restart,
   minimized-is-alive behavior, PID path reuse, stop-without-terminate, conflict,
   launch failure, and crash-loop circuit breaker.
-- [ ] Test `GetTickCount` wrap from `0xFFFFFFFF` to zero without time moving
+- [x] Test `GetTickCount` wrap from `0xFFFFFFFF` to zero without time moving
   backwards.
-- [ ] Implement independent lifecycle and clock; run under Python 2.7 x86 and
+- [x] Implement independent lifecycle and clock; run under Python 2.7 x86 and
   Python 3.8 x86, then commit.
 
 ### Task 2: XP process and window adapters
