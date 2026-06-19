@@ -89,10 +89,10 @@ compatibility until an XP SP1 VM smoke test passes.
 - Create: `v2/tests/legacy/test_legacy_runtime.py`
 - Modify: `v2/tests/test_behavior_parity.py`
 
-- [ ] Implement BOM-tolerant strict reads and XP-safe write-through temp +
+- [x] Implement BOM-tolerant strict reads and XP-safe write-through temp +
   `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`.
-- [ ] Implement atomic controller effects/audit with the same behavior contract.
-- [ ] Prove no V1/Modern imports, guards stay active through auth dialog, app
+- [x] Implement atomic controller effects/audit with the same behavior contract.
+- [x] Prove no V1/Modern imports, guards stay active through auth dialog, app
   minimize/restart parity, and safe rollback.
-- [ ] Run all Legacy tests on Python 2.7 x86, all V2 tests on Python 3.8 x86,
+- [x] Run all Legacy tests on Python 2.7 x86, all V2 tests on Python 3.8 x86,
   compile/import smoke, and leave a clean worktree before installation planning.
