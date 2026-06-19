@@ -9,7 +9,8 @@
     "operatorUser",
     "allowedApplication",
     "kiosk",
-    "logging"
+    "logging",
+    "testing"
   ],
   "properties": {
     "schemaVersion": {"const": 2},
@@ -89,6 +90,20 @@
         "level": {"enum": ["Debug", "Info", "Warning", "Error"]},
         "maxBytes": {"type": "integer", "minimum": 65536},
         "backupCount": {"type": "integer", "minimum": 1, "maximum": 20}
+      }
+    },
+    "testing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requireBackupBeforeTest",
+        "restoreAfterTest",
+        "testOnlySeparateOperatorUser"
+      ],
+      "properties": {
+        "requireBackupBeforeTest": {"const": true},
+        "restoreAfterTest": {"const": true},
+        "testOnlySeparateOperatorUser": {"const": true}
       }
     }
   }

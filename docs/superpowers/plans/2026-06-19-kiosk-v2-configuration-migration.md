@@ -22,11 +22,11 @@ change real permissions.
 - Create: `config/kiosk.v2.default.json`
 - Modify: `v2/tests/contracts/test_contract_documents.py`
 
-- [ ] Add required test-safety constants: backup before test, Restore after test,
+- [x] Add required test-safety constants: backup before test, Restore after test,
   and separate non-admin operator only.
-- [ ] Create a complete default with Notepad, manual minimized-window restore,
+- [x] Create a complete default with Notepad, manual minimized-window restore,
   Win+L enabled, restart circuit-breaker defaults, and rotating-log defaults.
-- [ ] Test exact field parity between default and contract and absence of every
+- [x] Test exact field parity between default and contract and absence of every
   credential/password/token field.
 
 ### Task 2: Strict validator and BOM-tolerant repository

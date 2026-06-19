@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "operatorUser": "KioskOperator",
+  "allowedApplication": {
+    "path": "C:\\Windows\\System32\\notepad.exe",
+    "arguments": "",
+    "workingDirectory": "C:\\Windows\\System32",
+    "restartOnExit": true,
+    "singleInstance": true,
+    "bringToFront": true,
+    "startMaximized": false,
+    "restoreIfMinimized": false,
+    "restartDelayMs": 2000,
+    "maxRestartAttempts": 5,
+    "restartWindowSeconds": 30
+  },
+  "kiosk": {
+    "allowWinL": true,
+    "adminSessionTimeoutSeconds": 300,
+    "explorerGuardIntervalMs": 500,
+    "keyboardGuardRequired": true
+  },
+  "logging": {
+    "logDirectory": "C:\\ProgramData\\Kiosk\\Logs",
+    "level": "Info",
+    "maxBytes": 1048576,
+    "backupCount": 5
+  },
+  "testing": {
+    "requireBackupBeforeTest": true,
+    "restoreAfterTest": true,
+    "testOnlySeparateOperatorUser": true
+  }
+}
