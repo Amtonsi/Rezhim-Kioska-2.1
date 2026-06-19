@@ -11,6 +11,8 @@ from kiosk_v2_modern.platform.desktop_isolation import (
     DesktopIsolation,
     NativeProcessApi,
     ProcessRecord,
+    ShellSurface,
+    WindowsShellSurfaceApi,
     WindowsProcessApi,
 )
 
@@ -31,6 +33,39 @@ class FakeProcessApi(object):
     def terminate_process(self, pid):
         self.terminated.append(pid)
         return pid not in self.failed_pids
+
+
+class FakeSurfaceApi(object):
+    def __init__(self, surfaces=None):
+        self.surfaces = list(surfaces or [])
+        self.hidden = []
+        self.shown = []
+
+    def list_shell_surfaces(self):
+        return list(self.surfaces)
+
+    def hide_window(self, hwnd):
+        self.hidden.append(hwnd)
+        return True
+
+    def show_window(self, hwnd):
+        self.shown.append(hwnd)
+        return True
+
+
+class FakeNativeSurfaceApi(object):
+    def enumerate_surfaces(self):
+        return [
+            (100, "Shell_TrayWnd", 10),
+            (101, "Button", 10),
+            (102, "Button", 11),
+        ]
+
+    def process_session_id(self, pid):
+        return {10: 7, 11: 8}[pid]
+
+    def show_window(self, hwnd, command):
+        return True
 
 
 class FakeNativeProcessApi(object):
@@ -139,6 +174,41 @@ class DesktopIsolationTests(unittest.TestCase):
         self.assertEqual([40], api.terminated)
         self.assertEqual((), result.terminated_pids)
         self.assertEqual((40,), result.failed_pids)
+
+    def test_failed_explorer_termination_hides_only_its_current_session_shell(self):
+        process_api = FakeProcessApi(
+            current_session=7,
+            processes=[
+                ProcessRecord(40, r"C:\Windows\explorer.exe", 7),
+                ProcessRecord(41, r"C:\Windows\explorer.exe", 8),
+                ProcessRecord(42, r"C:\Windows\notepad.exe", 7),
+            ],
+        )
+        process_api.failed_pids.add(40)
+        surfaces = FakeSurfaceApi(
+            [
+                ShellSurface(100, "Shell_TrayWnd", 40, 7),
+                ShellSurface(101, "Button", 40, 7),
+                ShellSurface(102, "Button", 41, 8),
+                ShellSurface(103, "Button", 42, 7),
+            ]
+        )
+        guard = DesktopIsolation(process_api, surface_api=surfaces)
+
+        result = guard.start()
+
+        self.assertEqual([100, 101], surfaces.hidden)
+        self.assertEqual((100, 101), result.hidden_hwnds)
+        guard.stop()
+        self.assertEqual([100, 101], surfaces.shown)
+
+    def test_windows_surface_adapter_attaches_session_ids(self):
+        api = WindowsShellSurfaceApi(native=FakeNativeSurfaceApi())
+
+        surfaces = api.list_shell_surfaces()
+
+        self.assertEqual([100, 101, 102], [item.hwnd for item in surfaces])
+        self.assertEqual([7, 7, 8], [item.session_id for item in surfaces])
 
     def test_windows_adapter_builds_records_and_terminates_exact_pid(self):
         native = FakeNativeProcessApi()
