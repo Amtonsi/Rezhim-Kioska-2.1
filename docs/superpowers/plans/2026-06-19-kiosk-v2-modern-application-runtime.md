@@ -41,13 +41,12 @@ def test_restarts_once_after_delay_when_process_exits(self):
     self.assertEqual(2, len(api.start_calls))
 
 
-def test_minimized_process_remains_running_and_is_not_reopened(self):
+def test_alive_process_remains_tracked_and_is_not_reopened(self):
     api = FakeProcessApi(existing=[ProcessRef(10, APP_PATH, running=True)])
     supervisor = ProcessSupervisor(settings(), api, FakeClock())
     supervisor.start()
-    api.minimized.add(10)
     result = supervisor.tick()
-    self.assertEqual("minimized", result.status)
+    self.assertEqual("running", result.status)
     self.assertEqual([], api.start_calls)
 ```
 
@@ -69,10 +68,11 @@ Expected: import error for `app.process_supervisor`.
 Create immutable-style `ApplicationSettings`, `ProcessRef`, and `SupervisorResult`.
 Normalize with `ntpath.normcase(ntpath.normpath(path))`. `start()` adopts the first
 running exact-path PID or calls `process_api.start(settings)` once. `tick()` returns
-`running`, `minimized`, `waiting_restart`, `restarted`, `start_failed`, `conflict`,
+`running`, `waiting_restart`, `restarted`, `start_failed`, `conflict`,
 or `stopped`; it never starts while the tracked PID is alive. Store
 `restart_due_at` only after observed exit or failed creation. Starting and stopping
-supervision must never terminate an application process.
+supervision must never terminate an application process. Minimized state belongs
+exclusively to `WindowCoordinator`; a minimized process is still `running` here.
 
 - [ ] **Step 4: Run GREEN and commit**
 
