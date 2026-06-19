@@ -51,15 +51,15 @@ change real permissions.
 - Create: `v2/migration/config_v1_to_v2.py`
 - Create: `v2/tests/modern/test_config_migration.py`
 
-- [ ] Write RED tests using current V1-shaped data plus unknown fields, password
+- [x] Write RED tests using current V1-shaped data plus unknown fields, password
   hashes, tokens, and BOM. Assert only approved values reach V2.
-- [ ] Assert source bytes remain identical, exact backup bytes are written and
+- [x] Assert source bytes remain identical, exact backup bytes are written and
   flushed before V2 creation, an existing different backup is never overwritten,
   and any failure leaves the previous V2 target unchanged.
-- [ ] Implement conservative defaults for new fields: 5 attempts/30 seconds,
+- [x] Implement conservative defaults for new fields: 5 attempts/30 seconds,
   1 MiB/5 log backups, 500 ms Explorer guard, required keyboard guard, and all
   three test-safety flags true. `allowWinL` is always true.
-- [ ] Run targeted/full V2 tests and commit.
+- [x] Run targeted/full V2 tests and commit.
 
 ### Task 4: Runtime settings mapping
 
