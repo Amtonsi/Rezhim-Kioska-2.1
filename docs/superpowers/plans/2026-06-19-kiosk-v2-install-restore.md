@@ -35,11 +35,11 @@
 
 ### Task 2: Elevated Local Operator Preflight
 
-- [ ] Write failing adapter tests for non-elevated denial, missing local user, local SID resolution, disabled-account denial, direct/indirect Administrators membership denial, and accepted standard user.
-- [ ] Run the tests and verify they fail because `operator_account.py` is absent.
-- [ ] Implement `OperatorIdentity`, `PreflightError`, `WindowsOperatorAccountApi`, and `OperatorPreflight`. Use `IsUserAnAdmin`, `NetUserGetInfo`, `LookupAccountNameW`, `NetUserGetLocalGroups(LG_INCLUDE_INDIRECT)`, and SID comparison with `S-1-5-32-544`; free every NetAPI buffer.
-- [ ] Add a source test forbidding `net.exe`, `wmic.exe`, PowerShell, password storage, user creation, or group mutation in preflight.
-- [ ] Run Modern/full tests and commit `feat: validate kiosk v2 operator account`.
+- [x] Write failing adapter tests for non-elevated denial, missing local user, local SID resolution, disabled-account denial, direct/indirect Administrators membership denial, and accepted standard user.
+- [x] Run the tests and verify they fail because `operator_account.py` is absent.
+- [x] Implement `OperatorIdentity`, `PreflightError`, `WindowsOperatorAccountApi`, and `OperatorPreflight`. Use `IsUserAnAdmin`, `NetUserGetInfo`, `LookupAccountNameW`, `NetUserGetLocalGroups(LG_INCLUDE_INDIRECT)`, and SID comparison with `S-1-5-32-544`; free every NetAPI buffer.
+- [x] Add a source test forbidding `net.exe`, `wmic.exe`, PowerShell, password storage, user creation, or group mutation in preflight.
+- [x] Run Modern/full tests and commit `feat: validate kiosk v2 operator account`.
 
 ### Task 3: Exact Registry and ACL Snapshots
 
