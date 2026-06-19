@@ -64,19 +64,19 @@ types, never passwords, typed text, tokens, or command arguments.
 - Create: `v2/modern/kiosk_v2_modern/app/admin_auth_service.py`
 - Create: `v2/tests/modern/test_admin_auth_service.py`
 
-- [ ] Write RED tests for three failed attempts, increasing delay, no Windows API
+- [x] Write RED tests for three failed attempts, increasing delay, no Windows API
   call while locked, reset after success, and no retained password attribute.
-- [ ] Implement a synchronous wrapper around `WindowsAdminAuth` using only a
+- [x] Implement a synchronous wrapper around `WindowsAdminAuth` using only a
   monotonic clock, username, failure count, and next-allowed timestamp. Password is
   passed directly to one authentication call and never assigned to `self`.
-- [ ] Return safe result codes and integer `retryAfterSeconds`; never include a
+- [x] Return safe result codes and integer `retryAfterSeconds`; never include a
   password or exception message.
-- [ ] Run targeted and full V2 tests, then commit.
+- [x] Run targeted and full V2 tests, then commit.
 
 ### Task 5: Acceptance checkpoint
 
-- [ ] Run all V2 tests on Python 3.8 x86.
-- [ ] Run Legacy V2 state tests directly on Python 2.7 x86.
-- [ ] Run `compileall` for Modern and `git diff --check`.
-- [ ] Record exact results and leave a clean worktree before planning configuration
+- [x] Run all V2 tests on Python 3.8 x86.
+- [x] Run Legacy V2 state tests directly on Python 2.7 x86.
+- [x] Run `compileall` for Modern and `git diff --check`.
+- [x] Record exact results and leave a clean worktree before planning configuration
   repository and V1-to-V2 migration.
