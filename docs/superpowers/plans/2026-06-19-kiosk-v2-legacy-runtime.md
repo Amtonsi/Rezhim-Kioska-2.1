@@ -39,14 +39,14 @@ compatibility until an XP SP1 VM smoke test passes.
 - Create: `v2/legacy/kiosk_v2_legacy/platform/window_api.py`
 - Create: `v2/tests/legacy/test_process_window_runtime.py`
 
-- [ ] Enumerate PIDs with Toolhelp32, query full paths with
+- [x] Enumerate PIDs with Toolhelp32, query full paths with
   `psapi.GetModuleFileNameExW`, verify liveness by exact normalized path, and close
   every handle. No process-termination primitive belongs to the app supervisor.
-- [ ] Launch a structured argument list once with `shell=False`.
-- [ ] Enumerate visible top-level windows by exact PID; report minimized without
+- [x] Launch a structured argument list once with `shell=False`.
+- [x] Enumerate visible top-level windows by exact PID; report minimized without
   restoring, restore only via explicit action, and suppress foreground changes in
   admin dialog/session.
-- [ ] Run Python 2.7/3.8 tests and commit.
+- [x] Run Python 2.7/3.8 tests and commit.
 
 ### Task 3: Legacy Explorer isolation and keyboard hook
 
