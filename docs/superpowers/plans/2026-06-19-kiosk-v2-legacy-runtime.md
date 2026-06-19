@@ -55,13 +55,13 @@ compatibility until an XP SP1 VM smoke test passes.
 - Create: `v2/legacy/kiosk_v2_legacy/platform/keyboard_guard.py`
 - Create: `v2/tests/legacy/test_security_guards.py`
 
-- [ ] Terminate only verified `explorer.exe` PIDs in the launcher Session ID using
+- [x] Terminate only verified `explorer.exe` PIDs in the launcher Session ID using
   XP APIs; enumerate/hide Start/taskbar/Desktop fallback windows in that same
   session when termination fails.
-- [ ] Implement `WH_KEYBOARD_LL` on a dedicated message thread. Block Win press and
+- [x] Implement `WH_KEYBOARD_LL` on a dedicated message thread. Block Win press and
   release, Win shortcuts, Ctrl+Esc, Ctrl+Shift+Esc, Alt+Tab, Ctrl+Alt+Tab,
   Alt+Esc/F4; call `LockWorkStation` for Win+L; pass normal text through.
-- [ ] Keep both guards active through admin dialog and stop only after successful
+- [x] Keep both guards active through admin dialog and stop only after successful
   auth/Restore. Run tests and commit.
 
 ### Task 4: Legacy local-admin auth, throttling, and logs
