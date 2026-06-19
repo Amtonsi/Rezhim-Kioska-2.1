@@ -1,8 +1,17 @@
 # -*- coding: utf-8 -*-
+import ctypes
+
+from ctypes import wintypes
 
 
 ERROR_LOGON_FAILURE = 1326
 ERROR_ACCOUNT_DISABLED = 1331
+ERROR_NO_IMPERSONATION_TOKEN = 1309
+LOGON32_LOGON_INTERACTIVE = 2
+LOGON32_PROVIDER_DEFAULT = 0
+SECURITY_IMPERSONATION = 2
+WIN_BUILTIN_ADMINISTRATORS_SID = 26
+SECURITY_MAX_SID_SIZE = 68
 
 
 class WindowsAuthError(Exception):
@@ -28,8 +37,8 @@ class AuthResult(object):
 
 
 class WindowsAdminAuth(object):
-    def __init__(self, api):
-        self.api = api
+    def __init__(self, api=None):
+        self.api = api or NativeAuthApi()
 
     def authenticate(self, username, password):
         username = (username or "").strip()
@@ -64,3 +73,115 @@ class WindowsAdminAuth(object):
         if int(code) == ERROR_ACCOUNT_DISABLED:
             return "disabled_account"
         return "api_error"
+
+
+class NativeAuthApi(object):
+    def __init__(self, advapi32=None, kernel32=None):
+        self.advapi32 = advapi32 or ctypes.windll.advapi32
+        self.kernel32 = kernel32 or ctypes.windll.kernel32
+        self._configure_signatures()
+
+    def _configure_signatures(self):
+        self.advapi32.LogonUserW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.HANDLE),
+        ]
+        self.advapi32.LogonUserW.restype = wintypes.BOOL
+        self.advapi32.CreateWellKnownSid.argtypes = [
+            ctypes.c_int,
+            wintypes.LPVOID,
+            wintypes.LPVOID,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        self.advapi32.CreateWellKnownSid.restype = wintypes.BOOL
+        self.advapi32.CheckTokenMembership.argtypes = [
+            wintypes.HANDLE,
+            wintypes.LPVOID,
+            ctypes.POINTER(wintypes.BOOL),
+        ]
+        self.advapi32.CheckTokenMembership.restype = wintypes.BOOL
+        self.advapi32.DuplicateToken.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.POINTER(wintypes.HANDLE),
+        ]
+        self.advapi32.DuplicateToken.restype = wintypes.BOOL
+        self.kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.kernel32.CloseHandle.restype = wintypes.BOOL
+        self.kernel32.GetLastError.argtypes = []
+        self.kernel32.GetLastError.restype = wintypes.DWORD
+
+    def logon_local(self, username, password):
+        return self._logon_user(username, password)
+
+    def is_local_administrator(self, token):
+        administrators_sid = self._create_administrators_sid()
+        try:
+            return self._check_token_membership(token, administrators_sid)
+        except WindowsAuthError as error:
+            if error.code != ERROR_NO_IMPERSONATION_TOKEN:
+                raise
+        duplicate = self._duplicate_impersonation_token(token)
+        try:
+            return self._check_token_membership(duplicate, administrators_sid)
+        finally:
+            self._close_handle(duplicate)
+
+    def close_token(self, token):
+        self._close_handle(token)
+
+    def _logon_user(self, username, password):
+        token = wintypes.HANDLE()
+        if not self.advapi32.LogonUserW(
+            username,
+            ".",
+            password,
+            LOGON32_LOGON_INTERACTIVE,
+            LOGON32_PROVIDER_DEFAULT,
+            ctypes.byref(token),
+        ):
+            raise self._error()
+        return token
+
+    def _create_administrators_sid(self):
+        sid = ctypes.create_string_buffer(SECURITY_MAX_SID_SIZE)
+        size = wintypes.DWORD(len(sid))
+        if not self.advapi32.CreateWellKnownSid(
+            WIN_BUILTIN_ADMINISTRATORS_SID,
+            None,
+            sid,
+            ctypes.byref(size),
+        ):
+            raise self._error()
+        return sid
+
+    def _check_token_membership(self, token, sid):
+        is_member = wintypes.BOOL()
+        if not self.advapi32.CheckTokenMembership(
+            token,
+            sid,
+            ctypes.byref(is_member),
+        ):
+            raise self._error()
+        return bool(is_member.value)
+
+    def _duplicate_impersonation_token(self, token):
+        duplicate = wintypes.HANDLE()
+        if not self.advapi32.DuplicateToken(
+            token,
+            SECURITY_IMPERSONATION,
+            ctypes.byref(duplicate),
+        ):
+            raise self._error()
+        return duplicate
+
+    def _close_handle(self, token):
+        if token:
+            self.kernel32.CloseHandle(token)
+
+    def _error(self):
+        return WindowsAuthError(int(self.kernel32.GetLastError()))

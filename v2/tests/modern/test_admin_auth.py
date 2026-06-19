@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(V2_ROOT, "modern"))
 
 from kiosk_v2_modern.platform.admin_auth import (
     AuthResult,
+    NativeAuthApi,
     WindowsAdminAuth,
     WindowsAuthError,
 )
@@ -33,6 +34,31 @@ class FakeAuthApi(object):
         return self.administrator
 
     def close_token(self, token):
+        self.closed.append(token)
+
+
+class TrackingNativeAuthApi(NativeAuthApi):
+    def __init__(self):
+        self.closed = []
+        self.membership_calls = []
+        self.membership_error = None
+        self.duplicate_token = 88
+
+    def _create_administrators_sid(self):
+        return "administrators-sid"
+
+    def _check_token_membership(self, token, sid):
+        self.membership_calls.append((token, sid))
+        if self.membership_error is not None:
+            error = self.membership_error
+            self.membership_error = None
+            raise error
+        return True
+
+    def _duplicate_impersonation_token(self, token):
+        return self.duplicate_token
+
+    def _close_handle(self, token):
         self.closed.append(token)
 
 
@@ -89,6 +115,28 @@ class WindowsAdminAuthTests(unittest.TestCase):
             },
             result.to_log_data(),
         )
+
+    def test_native_membership_retries_1309_with_duplicate_and_closes_it(self):
+        api = TrackingNativeAuthApi()
+        api.membership_error = WindowsAuthError(1309)
+
+        result = api.is_local_administrator(77)
+
+        self.assertTrue(result)
+        self.assertEqual(
+            [(77, "administrators-sid"), (88, "administrators-sid")],
+            api.membership_calls,
+        )
+        self.assertEqual([88], api.closed)
+
+    def test_native_membership_does_not_fallback_for_other_errors(self):
+        api = TrackingNativeAuthApi()
+        api.membership_error = WindowsAuthError(5)
+
+        with self.assertRaises(WindowsAuthError):
+            api.is_local_administrator(77)
+
+        self.assertEqual([], api.closed)
 
 
 if __name__ == "__main__":
