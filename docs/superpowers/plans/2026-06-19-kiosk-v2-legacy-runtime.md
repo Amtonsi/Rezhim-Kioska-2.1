@@ -72,13 +72,13 @@ compatibility until an XP SP1 VM smoke test passes.
 - Create: `v2/legacy/kiosk_v2_legacy/platform/audit_log.py`
 - Create: `v2/tests/legacy/test_auth_logging.py`
 
-- [ ] Use `LogonUserW`, local Administrators well-known SID,
+- [x] Use `LogonUserW`, local Administrators well-known SID,
   `CheckTokenMembership`, impersonation-token fallback, and `CloseHandle` on every
   path. Reject domain-qualified names and never retain a password.
-- [ ] Implement identical rate-limit behavior with an injected clock.
-- [ ] Write rotating UTF-8 JSONL with immediate recursive redaction and no typed
+- [x] Implement identical rate-limit behavior with an injected clock.
+- [x] Write rotating UTF-8 JSONL with immediate recursive redaction and no typed
   text/arguments/error messages.
-- [ ] Run tests on Python 2.7 x86 and commit.
+- [x] Run tests on Python 2.7 x86 and commit.
 
 ### Task 5: Legacy config and controller acceptance
 
