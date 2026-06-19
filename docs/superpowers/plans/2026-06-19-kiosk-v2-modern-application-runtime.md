@@ -16,7 +16,7 @@
 - Create: `v2/modern/kiosk_v2_modern/app/process_supervisor.py`
 - Create: `v2/tests/modern/test_process_supervisor.py`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 ```python
 def test_adopts_one_existing_exact_path_process_without_starting_duplicate(self):
@@ -55,7 +55,7 @@ a failed process creation enters bounded backoff instead of a tight retry loop,
 multiple existing exact-path instances produce `conflict` without another launch,
 and `stop_supervision()` never terminates the tracked application.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```powershell
 python -m unittest v2.tests.modern.test_process_supervisor -v
@@ -63,7 +63,7 @@ python -m unittest v2.tests.modern.test_process_supervisor -v
 
 Expected: import error for `app.process_supervisor`.
 
-- [ ] **Step 3: Implement pure lifecycle**
+- [x] **Step 3: Implement pure lifecycle**
 
 Create immutable-style `ApplicationSettings`, `ProcessRef`, and `SupervisorResult`.
 Normalize with `ntpath.normcase(ntpath.normpath(path))`. `start()` adopts the first
@@ -74,7 +74,7 @@ or `stopped`; it never starts while the tracked PID is alive. Store
 supervision must never terminate an application process. Minimized state belongs
 exclusively to `WindowCoordinator`; a minimized process is still `running` here.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
 ```powershell
 python -m unittest v2.tests.modern.test_process_supervisor -v
@@ -88,7 +88,7 @@ git commit -m "feat: supervise one exact kiosk v2 application"
 - Create: `v2/modern/kiosk_v2_modern/platform/process_runtime.py`
 - Create: `v2/tests/modern/test_process_runtime.py`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 Assert the adapter filters full normalized paths, forwards structured arguments and
 working directory to one process creation call, reports process liveness by handle/PID,
@@ -96,14 +96,14 @@ re-verifies the executable path when a PID may have been reused, and closes ever
 query handle. Assert source contains no generic termination of the allowed application
 or unrelated process enumeration side effects.
 
-- [ ] **Step 2: Implement adapter**
+- [x] **Step 2: Implement adapter**
 
 Use Toolhelp32 plus `QueryFullProcessImageNameW` for exact-path discovery. Start via
 `subprocess.Popen(command, cwd=working_directory)` where `command` is a pre-parsed
 list. Use `WaitForSingleObject(handle, 0)` for liveness and close query handles.
 Do not terminate the allowed application when supervision stops.
 
-- [ ] **Step 3: Run GREEN and commit**
+- [x] **Step 3: Run GREEN and commit**
 
 ```powershell
 python -m unittest v2.tests.modern.test_process_runtime -v
@@ -118,7 +118,7 @@ git commit -m "feat: add kiosk v2 process runtime adapter"
 - Create: `v2/modern/kiosk_v2_modern/platform/window_api.py`
 - Create: `v2/tests/modern/test_window_coordinator.py`
 
-- [ ] **Step 1: Write RED tests**
+- [x] **Step 1: Write RED tests**
 
 ```python
 def test_minimized_window_is_reported_without_restore(self):
@@ -143,14 +143,14 @@ def test_admin_dialog_prevents_foreground_change(self):
     self.assertEqual([], api.foreground_calls)
 ```
 
-- [ ] **Step 2: Implement coordinator and Win32 adapter**
+- [x] **Step 2: Implement coordinator and Win32 adapter**
 
 Enumerate top-level windows, retain only PIDs supplied by supervisor, use `IsIconic`,
 `ShowWindow(SW_RESTORE/SW_MAXIMIZE)`, `SetWindowPos`, and `SetForegroundWindow`.
 No periodic call restores a minimized window unless `restoreIfMinimized` is true;
 admin dialog/session always suppresses foreground changes.
 
-- [ ] **Step 3: Run GREEN and commit**
+- [x] **Step 3: Run GREEN and commit**
 
 ```powershell
 python -m unittest v2.tests.modern.test_window_coordinator -v
@@ -163,7 +163,7 @@ git commit -m "feat: coordinate kiosk v2 application windows"
 **Files:**
 - Create: `v2/tests/modern/test_application_runtime.py`
 
-- [ ] **Step 1: Add integrated fake scenario**
+- [x] **Step 1: Add integrated fake scenario**
 
 Simulate adopt, running, minimize, manual restore, exit, delayed restart, and admin
 dialog focus suppression. Assert one PID at every point and exactly two total start
@@ -171,7 +171,7 @@ calls only when the initial process did not already exist and after its exit del
 Also assert disabling supervision leaves the current process alive and restarting
 supervision adopts that same exact-path process instead of opening another instance.
 
-- [ ] **Step 2: Run full V2 suite and commit**
+- [x] **Step 2: Run full V2 suite and commit**
 
 ```powershell
 python -m unittest discover -s v2/tests -t . -v
