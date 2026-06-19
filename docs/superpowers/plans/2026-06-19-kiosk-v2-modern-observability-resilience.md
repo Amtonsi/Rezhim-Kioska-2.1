@@ -19,15 +19,15 @@ types, never passwords, typed text, tokens, or command arguments.
 - Create: `v2/modern/kiosk_v2_modern/platform/audit_log.py`
 - Create: `v2/tests/modern/test_audit_log.py`
 
-- [ ] Write RED tests proving nested keys containing `password`, `secret`,
+- [x] Write RED tests proving nested keys containing `password`, `secret`,
   `token`, `credential`, `typedText`, `arguments`, or `commandLine` are replaced
   by `[REDACTED]`; ordinary event metadata remains intact.
-- [ ] Test one JSON object per line, UTF-8 Russian text, configured byte rotation,
+- [x] Test one JSON object per line, UTF-8 Russian text, configured byte rotation,
   backup count, and clean handler shutdown.
-- [ ] Implement `SafeEvent`, recursive redaction, JSON-safe value conversion, and
+- [x] Implement `SafeEvent`, recursive redaction, JSON-safe value conversion, and
   `AuditLogger`. The API accepts only `event_name`, `level`, and structured fields;
   it never formats arbitrary exception messages.
-- [ ] Run targeted tests on Python 3.8 x86 and commit.
+- [x] Run targeted tests on Python 3.8 x86 and commit.
 
 ### Task 2: Controller transition audit
 
