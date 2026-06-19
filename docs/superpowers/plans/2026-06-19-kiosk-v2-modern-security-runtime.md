@@ -222,7 +222,7 @@ git commit -m "feat: isolate Explorer in kiosk v2 operator session"
 - Create: `v2/modern/kiosk_v2_modern/platform/keyboard_guard.py`
 - Create: `v2/tests/modern/test_keyboard_guard.py`
 
-- [ ] **Step 1: Write failing shortcut and text tests**
+- [x] **Step 1: Write failing shortcut and text tests**
 
 ```python
 def test_blocks_escape_shortcuts_but_passes_text_and_keyup(self):
@@ -252,7 +252,7 @@ def test_guard_remains_running_during_admin_dialog(self):
     self.assertFalse(guard.running)
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```powershell
 python -m unittest v2.tests.modern.test_keyboard_guard -v
@@ -260,7 +260,7 @@ python -m unittest v2.tests.modern.test_keyboard_guard -v
 
 Expected: import error for `platform.keyboard_guard`.
 
-- [ ] **Step 3: Implement state and hook service**
+- [x] **Step 3: Implement state and hook service**
 
 The pure `KeyboardState` blocks the approved list only on key-down, forwards all
 key-up events, calls workstation lock for Win+L, resets stale modifiers from
@@ -268,7 +268,7 @@ key-up events, calls workstation lock for Win+L, resets stale modifiers from
 uses `WH_KEYBOARD_LL` and calls `CallNextHookEx` for every non-blocked event. It logs
 shortcut names only, never virtual keys representing ordinary text.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
 ```powershell
 python -m unittest v2.tests.modern.test_keyboard_guard -v

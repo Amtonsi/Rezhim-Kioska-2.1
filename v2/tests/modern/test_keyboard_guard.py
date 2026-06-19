@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import threading
 import unittest
 
 
@@ -11,6 +12,7 @@ from kiosk_v2_modern.platform.keyboard_guard import (
     HookDispatcher,
     KeyboardGuard,
     KeyboardState,
+    NativeHookLoop,
     VK_CONTROL,
     VK_ESCAPE,
     VK_LWIN,
@@ -32,6 +34,56 @@ class FakeHookLoop(object):
 
     def stop(self):
         self.stop_calls += 1
+
+
+class FakeNativeHookApi(object):
+    def __init__(self):
+        self.callback = None
+        self.hook_handle = 500
+        self.thread_id = 77
+        self.stop_event = threading.Event()
+        self.uninstalled = []
+        self.next_calls = []
+        self.blocked_shortcuts = []
+        self.down = set()
+        self.lock_calls = 0
+
+    def create_callback(self, callback):
+        self.callback = callback
+        return callback
+
+    def current_thread_id(self):
+        return self.thread_id
+
+    def install(self, callback):
+        self.callback = callback
+        return self.hook_handle
+
+    def run_message_loop(self):
+        self.stop_event.wait(2.0)
+
+    def request_stop(self, thread_id):
+        self.asserted_thread_id = thread_id
+        self.stop_event.set()
+        return True
+
+    def uninstall(self, hook_handle):
+        self.uninstalled.append(hook_handle)
+        return True
+
+    def keyboard_vk_code(self, raw_event):
+        return int(raw_event)
+
+    def call_next(self, hook_handle, n_code, message, raw_event):
+        self.next_calls.append((hook_handle, n_code, message, raw_event))
+        return 42
+
+    def modifier_down(self, vk_code):
+        return vk_code in self.down
+
+    def lock_workstation(self):
+        self.lock_calls += 1
+        return True
 
 
 class KeyboardGuardTests(unittest.TestCase):
@@ -69,6 +121,15 @@ class KeyboardGuardTests(unittest.TestCase):
         self.assertTrue(decision.blocked)
         self.assertEqual("Win+L", decision.shortcut)
         self.assertEqual([True], locks)
+
+    def test_win_keyup_is_also_blocked_to_prevent_start_menu(self):
+        state = KeyboardState()
+
+        down = state.on_key(VK_LWIN, WM_KEYDOWN)
+        up = state.on_key(VK_LWIN, WM_KEYUP)
+
+        self.assertTrue(down.blocked)
+        self.assertTrue(up.blocked)
 
     def test_guard_remains_running_during_admin_dialog(self):
         hook = FakeHookLoop()
@@ -118,6 +179,34 @@ class KeyboardGuardTests(unittest.TestCase):
 
         self.assertEqual(1, result)
         self.assertEqual(1, len(next_calls))
+
+    def test_native_loop_forwards_text_and_blocks_only_forbidden_shortcut(self):
+        native = FakeNativeHookApi()
+        loop = NativeHookLoop(native=native)
+
+        text_result = loop.dispatch_for_test(0, WM_KEYDOWN, ord("A"))
+        native.down.add(VK_MENU)
+        loop.dispatch_for_test(0, WM_KEYDOWN, VK_MENU)
+        blocked_result = loop.dispatch_for_test(0, WM_KEYDOWN, VK_TAB)
+
+        self.assertEqual(42, text_result)
+        self.assertEqual(1, blocked_result)
+        self.assertEqual(
+            [(None, 0, WM_KEYDOWN, ord("A")), (None, 0, WM_KEYDOWN, VK_MENU)],
+            native.next_calls,
+        )
+
+    def test_native_loop_installs_and_uninstalls_hook_on_its_message_thread(self):
+        native = FakeNativeHookApi()
+        loop = NativeHookLoop(native=native)
+
+        loop.start()
+        self.assertTrue(loop.running)
+        loop.stop()
+
+        self.assertFalse(loop.running)
+        self.assertEqual(77, native.asserted_thread_id)
+        self.assertEqual([500], native.uninstalled)
 
 
 if __name__ == "__main__":
