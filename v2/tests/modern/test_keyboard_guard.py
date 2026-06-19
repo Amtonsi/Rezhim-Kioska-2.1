@@ -8,6 +8,7 @@ V2_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file
 sys.path.insert(0, os.path.join(V2_ROOT, "modern"))
 
 from kiosk_v2_modern.platform.keyboard_guard import (
+    HookDispatcher,
     KeyboardGuard,
     KeyboardState,
     VK_CONTROL,
@@ -87,6 +88,36 @@ class KeyboardGuardTests(unittest.TestCase):
         guard.return_to_operator()
         self.assertTrue(guard.running)
         self.assertEqual(2, hook.start_calls)
+
+    def test_dispatcher_calls_next_for_text_and_negative_hook_codes(self):
+        next_calls = []
+        dispatcher = HookDispatcher(
+            KeyboardState(),
+            call_next=lambda n_code, message, vk_code: next_calls.append(
+                (n_code, message, vk_code)
+            ) or 42,
+        )
+
+        self.assertEqual(42, dispatcher.handle(0, WM_KEYDOWN, ord("A")))
+        self.assertEqual(42, dispatcher.handle(-1, WM_KEYDOWN, ord("B")))
+        self.assertEqual(
+            [(0, WM_KEYDOWN, ord("A")), (-1, WM_KEYDOWN, ord("B"))],
+            next_calls,
+        )
+
+    def test_dispatcher_does_not_call_next_for_blocked_shortcut(self):
+        next_calls = []
+        state = KeyboardState()
+        dispatcher = HookDispatcher(
+            state,
+            call_next=lambda *args: next_calls.append(args) or 42,
+        )
+        dispatcher.handle(0, WM_KEYDOWN, VK_MENU)
+
+        result = dispatcher.handle(0, WM_KEYDOWN, VK_TAB)
+
+        self.assertEqual(1, result)
+        self.assertEqual(1, len(next_calls))
 
 
 if __name__ == "__main__":

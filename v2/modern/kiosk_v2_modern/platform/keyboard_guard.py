@@ -106,3 +106,17 @@ class KeyboardGuard(object):
 
     def return_to_operator(self):
         self.start()
+
+
+class HookDispatcher(object):
+    def __init__(self, keyboard_state, call_next):
+        self.keyboard_state = keyboard_state
+        self.call_next = call_next
+
+    def handle(self, n_code, message, vk_code):
+        if int(n_code) < 0:
+            return self.call_next(n_code, message, vk_code)
+        decision = self.keyboard_state.on_key(vk_code, message)
+        if decision.blocked:
+            return 1
+        return self.call_next(n_code, message, vk_code)
