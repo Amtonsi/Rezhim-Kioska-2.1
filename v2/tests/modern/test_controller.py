@@ -44,7 +44,42 @@ class FailingEffects(FakeEffects):
         super(FailingEffects, self).run(name)
 
 
+class SecretFailingEffects(FailingEffects):
+    def run(self, name):
+        if name == self.failed_name:
+            raise RuntimeError("password=hunter2")
+        super(FailingEffects, self).run(name)
+
+
+class FakeAudit(object):
+    def __init__(self, fail=False):
+        self.fail = fail
+        self.events = []
+
+    def emit(self, event_name, level="Info", **fields):
+        if self.fail:
+            raise OSError("audit unavailable")
+        self.events.append((event_name, level, fields))
+
+
 class AppControllerTests(unittest.TestCase):
+    def test_successful_transition_emits_safe_structured_audit_event(self):
+        effects = FakeEffects()
+        audit = FakeAudit()
+        controller = AppController(StateMachine(behavior()), effects, audit=audit)
+
+        transition = controller.handle("boot_completed")
+
+        self.assertEqual("OPERATOR", transition.to_state)
+        self.assertEqual(1, len(audit.events))
+        event_name, level, fields = audit.events[0]
+        self.assertEqual("state_transition", event_name)
+        self.assertEqual("Info", level)
+        self.assertEqual("STARTING", fields["fromState"])
+        self.assertEqual("OPERATOR", fields["toState"])
+        self.assertEqual("boot_completed", fields["transitionEvent"])
+        self.assertEqual(tuple(transition.effects), fields["effects"])
+
     def test_unlock_request_keeps_guards_running(self):
         effects = FakeEffects()
         controller = AppController(StateMachine(behavior()), effects)
@@ -85,6 +120,46 @@ class AppControllerTests(unittest.TestCase):
         self.assertEqual(
             ["start_keyboard_guard", "start_desktop_isolation"],
             effects.rollback_calls,
+        )
+
+    def test_effect_failure_audit_never_contains_exception_message(self):
+        effects = SecretFailingEffects("start_supervisor")
+        audit = FakeAudit()
+        controller = AppController(StateMachine(behavior()), effects, audit=audit)
+
+        effects.failed_name = "start_supervisor"
+        with self.assertRaises(EffectExecutionError) as raised:
+            controller.handle("boot_completed")
+
+        self.assertNotIn("password", str(raised.exception).lower())
+        self.assertEqual(1, len(audit.events))
+        event_name, level, fields = audit.events[0]
+        self.assertEqual("effect_failed", event_name)
+        self.assertEqual("Error", level)
+        self.assertEqual("RuntimeError", fields["errorType"])
+        self.assertEqual("start_supervisor", fields["failedEffect"])
+        self.assertNotIn("password", repr(fields).lower())
+
+    def test_audit_failure_does_not_undo_successful_security_transition(self):
+        effects = FakeEffects()
+        controller = AppController(
+            StateMachine(behavior()),
+            effects,
+            audit=FakeAudit(fail=True),
+        )
+
+        result = controller.handle("boot_completed")
+
+        self.assertEqual("OPERATOR", result.to_state)
+        self.assertEqual("OPERATOR", controller.state)
+        self.assertEqual(
+            [
+                "start_desktop_isolation",
+                "start_keyboard_guard",
+                "start_supervisor",
+                "show_operator_ui",
+            ],
+            effects.calls,
         )
 
 

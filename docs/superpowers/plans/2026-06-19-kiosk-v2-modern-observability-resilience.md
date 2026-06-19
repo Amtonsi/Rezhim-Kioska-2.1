@@ -35,11 +35,11 @@ types, never passwords, typed text, tokens, or command arguments.
 - Modify: `v2/modern/kiosk_v2_modern/app/controller.py`
 - Modify: `v2/tests/modern/test_controller.py`
 
-- [ ] Write RED tests for one successful transition event and one failed-effect
+- [x] Write RED tests for one successful transition event and one failed-effect
   event. Failure data may contain `errorType` but not `str(error)`.
-- [ ] Inject an optional audit port into `AppController`; preserve current atomic
+- [x] Inject an optional audit port into `AppController`; preserve current atomic
   rollback behavior when the audit sink itself fails.
-- [ ] Run controller and full V2 tests, then commit.
+- [x] Run controller and full V2 tests, then commit.
 
 ### Task 3: Bounded restart circuit breaker
 
