@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "designSurface": {"width": 1440, "height": 900},
+  "brand": {
+    "logoText": "РК",
+    "title": "Режим киоска",
+    "year": "2026",
+    "developer": "разработал: Абдрахманов Амаль Даулетович"
+  },
+  "screens": ["operator", "adminDialog", "adminSession"],
+  "requiredActions": [
+    "unlock",
+    "restoreApplication",
+    "unlockDesktop",
+    "toggleSupervision",
+    "returnToKiosk",
+    "changeApplication"
+  ]
+}

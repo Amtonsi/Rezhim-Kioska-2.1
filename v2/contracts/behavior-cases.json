@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "initialState": "STARTING",
+  "transitions": [
+    {
+      "from": "STARTING",
+      "event": "boot_completed",
+      "to": "OPERATOR",
+      "effects": [
+        "start_desktop_isolation",
+        "start_keyboard_guard",
+        "start_supervisor",
+        "show_operator_ui"
+      ]
+    },
+    {
+      "from": "OPERATOR",
+      "event": "unlock_requested",
+      "to": "ADMIN_DIALOG",
+      "effects": ["show_admin_dialog"]
+    },
+    {
+      "from": "ADMIN_DIALOG",
+      "event": "auth_cancelled",
+      "to": "OPERATOR",
+      "effects": ["show_operator_ui"]
+    },
+    {
+      "from": "ADMIN_DIALOG",
+      "event": "auth_failed",
+      "to": "OPERATOR",
+      "effects": ["show_auth_error", "show_operator_ui"]
+    },
+    {
+      "from": "ADMIN_DIALOG",
+      "event": "auth_succeeded",
+      "to": "ADMIN_SESSION",
+      "effects": [
+        "stop_keyboard_guard",
+        "stop_desktop_isolation",
+        "show_admin_session"
+      ]
+    },
+    {
+      "from": "ADMIN_SESSION",
+      "event": "return_to_kiosk",
+      "to": "OPERATOR",
+      "effects": [
+        "start_desktop_isolation",
+        "start_keyboard_guard",
+        "show_operator_ui"
+      ]
+    },
+    {
+      "from": "ADMIN_SESSION",
+      "event": "restore_requested",
+      "to": "RESTORING",
+      "effects": [
+        "stop_keyboard_guard",
+        "stop_desktop_isolation",
+        "run_restore"
+      ]
+    },
+    {
+      "from": "RESTORING",
+      "event": "restore_completed",
+      "to": "STOPPED",
+      "effects": ["show_restore_result"]
+    }
+  ]
+}

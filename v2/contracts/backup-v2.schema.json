@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local.invalid/backup-v2.schema.json",
+  "title": "Kiosk V2 backup metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "buildFamily",
+    "operatorSid",
+    "operatorUser",
+    "originalShell",
+    "registryValues",
+    "fileAcls",
+    "configBackup",
+    "integritySha256"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "buildFamily": {"enum": ["modern", "legacy"]},
+    "operatorSid": {"type": "string", "minLength": 1},
+    "operatorUser": {"type": "string", "minLength": 1},
+    "originalShell": {"type": "string"},
+    "registryValues": {"type": "array", "items": {"type": "object"}},
+    "fileAcls": {"type": "array", "items": {"type": "object"}},
+    "configBackup": {"type": "object"},
+    "integritySha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
