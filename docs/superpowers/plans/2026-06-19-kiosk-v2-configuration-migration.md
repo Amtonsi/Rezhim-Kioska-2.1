@@ -67,11 +67,11 @@ change real permissions.
 - Create: `v2/modern/kiosk_v2_modern/app/runtime_settings.py`
 - Create: `v2/tests/modern/test_runtime_settings.py`
 
-- [ ] Parse the V2 argument string through an injected Windows command-line parser
+- [x] Parse the V2 argument string through an injected Windows command-line parser
   into an immutable sequence; never use `shell=True`.
-- [ ] Map every supervisor/window/logging/admin-timeout setting and verify arbitrary
+- [x] Map every supervisor/window/logging/admin-timeout setting and verify arbitrary
   executable paths with spaces are preserved exactly.
-- [ ] Prove config dictionaries are not mutated and no password-like field can
+- [x] Prove config dictionaries are not mutated and no password-like field can
   enter runtime settings.
-- [ ] Run full V2/Legacy checkpoints, `compileall`, and `git diff --check`; leave a
+- [x] Run full V2/Legacy checkpoints, `compileall`, and `git diff --check`; leave a
   clean worktree before transactional installation planning.
