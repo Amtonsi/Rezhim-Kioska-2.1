@@ -90,3 +90,19 @@ Restore должен вернуть `explorer.exe` как shell оператор
 ```text
 Отказано в доступе. Для выполнения действия требуются права администратора Windows.
 ```
+# Kiosk V2: Restore/Undo
+
+Run the Restore executable from a separate elevated local administrator session.
+Restore validates the backup SHA-256, build family, operator name/SID, and every
+allowlisted target before writing. It restores previous file bytes, then exact
+DACLs, then exact operator registry values including the previous shell. Values
+that were absent before installation are deleted rather than replaced with guessed
+defaults.
+
+`recover-desktop` is an emergency current-session action. It shows only shell
+surfaces in that session and starts `explorer.exe` only when no exact current-session
+Explorer is running. It does not replace full Restore.
+
+Never delete the backup after an incomplete Restore. The result lists every item
+that could not be recovered without including exception text, passwords, or typed
+input.

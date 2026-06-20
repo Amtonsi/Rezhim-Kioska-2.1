@@ -23,3 +23,13 @@ Windows XP без SP и Windows 2000 не поддерживаются. Legacy �
 Home-редакции используют `home_fallback`: shell replacement и пользовательские registry policies не дают гарантий уровня Enterprise. Профили AppLocker/Shell Launcher применимы только там, где функция реально доступна редакции Windows.
 
 На текущем доступном Windows 11 пройдены 196 Modern unit/regression-тестов и 84 Legacy-теста. Оба EXE проверены как PE32/x86; Legacy дополнительно прошел безопасный wrong-platform smoke с кодом выхода 3 и без изменения shell.
+# Kiosk V2 compatibility status
+
+- Modern source baseline: Python 3.8 x86, Windows 7 through Windows 11.
+- Legacy source baseline: Python 2.7 x86 and XP-compatible Win32/NetAPI functions,
+  intended for Windows XP SP1 and Windows Server 2003.
+- Home editions use shell replacement, per-user registry policy, desktop isolation,
+  and keyboard filtering; they do not provide Enterprise-equivalent AppLocker or
+  Shell Launcher guarantees.
+- XP and Server 2003 are end-of-life. Source compatibility is tested, but a frozen
+  Legacy executable is not supported evidence until it passes the required VM run.

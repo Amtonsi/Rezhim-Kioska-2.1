@@ -140,3 +140,16 @@ C:\ProgramData\Kiosk\Logs\kiosk.log
 
 
 
+# Kiosk V2 safe test order
+
+1. Use only a VM snapshot or the separate local non-administrator operator account.
+2. Run dry-run and verify that the main account SID is not the target SID.
+3. Create and verify backup before applying.
+4. Apply, sign in as the operator, and execute the keyboard/application/admin tests.
+5. Run Restore from the administrator account in a `finally` step.
+6. Verify Explorer, Start, taskbar, keyboard behavior, services, drivers, and startup.
+7. Revert the VM snapshot when testing XP, Server 2003, or policy profiles.
+
+The development laptop is not a substitute for the required Windows 7, XP SP1,
+and Server 2003 VM acceptance runs. A build remains unverified until its matching VM
+test and Restore both succeed.

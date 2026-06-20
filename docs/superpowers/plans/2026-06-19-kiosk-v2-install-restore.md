@@ -68,10 +68,10 @@
 
 ### Task 6: Safe Commands, Scripts, and Acceptance Documentation
 
-- [ ] Write CLI tests proving every mutating command defaults to dry-run, `--apply` requires elevation, `test-mode` requires a separate non-admin operator and backup, and its `finally` path always invokes Restore.
-- [ ] Implement Modern and Legacy command parsers with commands `install`, `uninstall`, `repair`, `restore`, `dry-run`, `test-mode`, and `recover-desktop`. Return non-zero for incomplete rollback or Restore.
-- [ ] Add PowerShell/CMD wrappers that pass structured arguments, never embed passwords, and never auto-apply.
-- [ ] Update `INSTALL.md`, `RESTORE.md`, `TESTING.md`, `SECURITY.md`, and `COMPATIBILITY.md` with separate Modern/Legacy commands, emergency recovery, XP/Home limits, and the rule that no platform is ready without VM evidence.
+- [x] Write CLI tests proving every mutating command defaults to dry-run, `--apply` requires elevation, `test-mode` requires a separate non-admin operator and backup, and its `finally` path always invokes Restore.
+- [x] Implement Modern and Legacy command parsers with commands `install`, `uninstall`, `repair`, `restore`, `dry-run`, `test-mode`, and `recover-desktop`. Return non-zero for incomplete rollback or Restore.
+- [x] Add PowerShell/CMD wrappers that pass structured arguments, never embed passwords, and never auto-apply.
+- [x] Update `INSTALL.md`, `RESTORE.md`, `TESTING.md`, `SECURITY.md`, and `COMPATIBILITY.md` with separate Modern/Legacy commands, emergency recovery, XP/Home limits, and the rule that no platform is ready without VM evidence.
 - [ ] Run all tests and frozen-build smoke checks without applying shell/policy changes to the development laptop.
 - [ ] Commit `docs: document kiosk v2 transactional recovery`.
 

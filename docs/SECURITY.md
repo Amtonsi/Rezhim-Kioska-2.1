@@ -110,3 +110,14 @@ Watchdog и поиск окна разрешенного приложения и
 Логирование устойчиво к отказу доступа к `%PROGRAMDATA%`: при ошибке используется пользовательский fallback-каталог, а если недоступен и он, киоск продолжает работу без падения. Логи ротируются и не содержат пароли или вводимые символы.
 
 
+# Kiosk V2 security boundaries
+
+V2 changes only the verified operator SID. It never writes the administrator's
+current-user hive, stores Windows credentials, records keystrokes, stops services,
+changes drivers, clears startup, or mass-terminates processes. The operator account
+must be a standard local account.
+
+Backup and configuration files receive protected DACLs. Configuration is readable
+but not writable by the operator; backup is accessible only to SYSTEM and local
+Administrators. An external allowed executable is validated but its DACL is not
+changed unless it is inside the approved installation root.

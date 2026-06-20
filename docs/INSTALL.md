@@ -138,3 +138,17 @@ python main.py status --config .\config\kiosk.json
 ```text
 Отказано в доступе. Для выполнения действия требуются права администратора Windows.
 ```
+# Kiosk V2: transactional installation
+
+V2 has two independent build families: Modern for Windows 7-11 and Legacy for
+Windows XP SP1/Server 2003. Always run `dry-run` first from an elevated local
+administrator account. The named operator must already exist, have a profile with
+`NTUSER.DAT`, and must not belong directly or indirectly to local Administrators.
+
+Installation captures the operator shell, allowlisted policy values, file DACLs,
+and previous installed files before the first write. Files and DACLs are applied
+first, operator policies second, and the per-user shell last. An error rolls applied
+operations back in reverse order and preserves the integrity-checked backup.
+
+PowerShell wrappers under `v2/scripts` never apply automatically. Pass `-Apply`
+explicitly only after reviewing dry-run output and verifying the backup location.
