@@ -28,12 +28,15 @@ class FakeHookLoop(object):
     def __init__(self):
         self.start_calls = 0
         self.stop_calls = 0
+        self.running = False
 
     def start(self):
         self.start_calls += 1
+        self.running = True
 
     def stop(self):
         self.stop_calls += 1
+        self.running = False
 
 
 class FakeNativeHookApi(object):
@@ -149,6 +152,19 @@ class KeyboardGuardTests(unittest.TestCase):
         guard.return_to_operator()
         self.assertTrue(guard.running)
         self.assertEqual(2, hook.start_calls)
+
+    def test_dialog_restarts_guard_when_hook_loop_has_stopped(self):
+        hook = FakeHookLoop()
+        guard = KeyboardGuard(hook)
+        guard.start()
+        hook.running = False
+
+        guard.enter_admin_dialog()
+
+        self.assertTrue(guard.running)
+        self.assertTrue(hook.running)
+        self.assertEqual(2, hook.start_calls)
+        self.assertEqual(0, hook.stop_calls)
 
     def test_dispatcher_calls_next_for_text_and_negative_hook_codes(self):
         next_calls = []

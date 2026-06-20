@@ -67,6 +67,7 @@ class LauncherSession(object):
     def handle_action(self, action):
         state = self.controller.state
         if action == "unlock" and state == "OPERATOR":
+            self.keyboard.enter_admin_dialog()
             self.controller.handle("unlock_requested")
             return
         if action == "restoreApplication" and state in ("OPERATOR", "ADMIN_DIALOG"):
@@ -124,6 +125,8 @@ class LauncherSession(object):
             state = self.controller.state
 
         if state in ("OPERATOR", "ADMIN_DIALOG"):
+            if state == "ADMIN_DIALOG":
+                self.keyboard.enter_admin_dialog()
             isolation = self.desktop.tick()
             failed = getattr(isolation, "failed_pids", ()) if isolation is not None else ()
             self.isolation_degraded = bool(failed)

@@ -143,12 +143,15 @@ class FakeHookLoop(object):
     def __init__(self):
         self.start_calls = 0
         self.stop_calls = 0
+        self.running = False
 
     def start(self):
         self.start_calls += 1
+        self.running = True
 
     def stop(self):
         self.stop_calls += 1
+        self.running = False
 
 
 class LegacySecurityGuardTests(unittest.TestCase):
@@ -246,6 +249,19 @@ class LegacySecurityGuardTests(unittest.TestCase):
         self.assertFalse(guard.running)
         guard.return_to_operator()
         self.assertTrue(guard.running)
+
+    def test_dialog_restarts_guard_when_hook_loop_has_stopped(self):
+        hook = FakeHookLoop()
+        guard = KeyboardGuard(hook)
+        guard.start()
+        hook.running = False
+
+        guard.enter_admin_dialog()
+
+        self.assertTrue(guard.running)
+        self.assertTrue(hook.running)
+        self.assertEqual(2, hook.start_calls)
+        self.assertEqual(0, hook.stop_calls)
 
 
 if __name__ == "__main__":

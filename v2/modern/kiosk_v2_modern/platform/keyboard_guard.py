@@ -117,7 +117,7 @@ class KeyboardGuard(object):
         self.running = False
 
     def start(self):
-        if self.running:
+        if self.running and self._hook_loop_running():
             return
         self.hook_loop.start()
         self.running = True
@@ -129,6 +129,7 @@ class KeyboardGuard(object):
         self.running = False
 
     def enter_admin_dialog(self):
+        self.start()
         return self.running
 
     def authentication_succeeded(self):
@@ -136,6 +137,9 @@ class KeyboardGuard(object):
 
     def return_to_operator(self):
         self.start()
+
+    def _hook_loop_running(self):
+        return bool(getattr(self.hook_loop, "running", self.running))
 
 
 class HookDispatcher(object):
