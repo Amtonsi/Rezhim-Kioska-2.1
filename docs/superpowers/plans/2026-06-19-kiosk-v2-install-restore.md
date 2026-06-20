@@ -43,12 +43,12 @@
 
 ### Task 3: Exact Registry and ACL Snapshots
 
-- [ ] Write failing registry tests for absent/present values, exact type/data capture, operator-SID-only paths, hive load/unload symmetry, apply verification, and restore deletion of originally absent values.
-- [ ] Implement registry value records and an operator hive context. Use `HKEY_USERS\\<operatorSid>` when mounted; otherwise load only `<ProfileImagePath>\\NTUSER.DAT`, always unload in `finally`, and never write HKCU of the administrative account.
-- [ ] Define only these operator values: per-user Winlogon `Shell`, `DisableTaskMgr`, `DisableRegistryTools`, `DisableCMD`, `NoRun`, `NoControlPanel`, `NoViewContextMenu`, `NoTrayContextMenu`, `NoSetTaskbar`, and `NoWinKeys`.
-- [ ] Write failing ACL tests for SDDL capture, administrator/system full control, operator read/execute, config write denial, exact restore, and paths outside approved installation/config targets.
-- [ ] Implement ACL capture/apply/restore with `GetNamedSecurityInfoW`, SDDL conversion, and `SetNamedSecurityInfoW`; do not change the allowed executable unless it is inside the protected install directory.
-- [ ] Run tests and commit `feat: snapshot kiosk v2 registry and acls`.
+- [x] Write failing registry tests for absent/present values, exact type/data capture, operator-SID-only paths, hive load/unload symmetry, apply verification, and restore deletion of originally absent values.
+- [x] Implement registry value records and an operator hive context. Use `HKEY_USERS\\<operatorSid>` when mounted; otherwise load only `<ProfileImagePath>\\NTUSER.DAT`, always unload in `finally`, and never write HKCU of the administrative account.
+- [x] Define only these operator values: per-user Winlogon `Shell`, `DisableTaskMgr`, `DisableRegistryTools`, `DisableCMD`, `NoRun`, `NoControlPanel`, `NoViewContextMenu`, `NoTrayContextMenu`, `NoSetTaskbar`, and `NoWinKeys`.
+- [x] Write failing ACL tests for SDDL capture, administrator/system full control, operator read/execute, config write denial, exact restore, and paths outside approved installation/config targets.
+- [x] Implement ACL capture/apply/restore with `GetNamedSecurityInfoW`, SDDL conversion, and `SetNamedSecurityInfoW`; do not change the allowed executable unless it is inside the protected installation roots supplied to the manager.
+- [x] Run tests and commit `feat: snapshot kiosk v2 registry and acls`.
 
 ### Task 4: Modern Install, Repair, Restore, and Recovery
 
