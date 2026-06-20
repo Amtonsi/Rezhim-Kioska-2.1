@@ -47,6 +47,42 @@ class LauncherEntrypoint(object):
         return self.bootstrap_factory().run()
 
 
+class ConfigCheck(object):
+    def __init__(self, repository, settings_factory):
+        self.repository = repository
+        self.settings_factory = settings_factory
+
+    def run(self):
+        config = self.repository.load(require_existing_app=True)
+        self.settings_factory.build(config)
+        return 0
+
+
+class LauncherCommand(object):
+    def __init__(self, family_guard, bootstrap_factory, config_check):
+        self.family_guard = family_guard
+        self.bootstrap_factory = bootstrap_factory
+        self.config_check = config_check
+
+    def run(self, argv):
+        arguments = list(argv or ())
+        if arguments == ["--platform-check"]:
+            try:
+                self.family_guard.check()
+                return 0
+            except Exception:
+                return 4
+        if arguments == ["--check-config"]:
+            self.family_guard.check()
+            return self.config_check.run()
+        if arguments:
+            raise ValueError("Unsupported launcher arguments")
+        return LauncherEntrypoint(
+            self.family_guard,
+            self.bootstrap_factory,
+        ).run()
+
+
 class MonotonicClock(object):
     def monotonic(self):
         return time.monotonic()
@@ -196,7 +232,7 @@ def build_native_bootstrap(files, root_factory=None):
     )
 
 
-def run_default(executable_directory=None, resource_directory=None):
+def run_default(argv=None, executable_directory=None, resource_directory=None):
     executable_directory = executable_directory or os.path.dirname(
         os.path.abspath(sys.executable)
     )
@@ -206,12 +242,21 @@ def run_default(executable_directory=None, resource_directory=None):
         executable_directory,
     )
     files = resolve_runtime_files(executable_directory, resource_directory)
+    from kiosk_v2_modern.app.config_repository import ConfigRepository, ConfigValidator
+    from kiosk_v2_modern.app.runtime_settings import RuntimeSettingsFactory
+    from kiosk_v2_modern.platform.command_line import WindowsArgumentParser
     from kiosk_v2_modern.platform.family_guard import WindowsFamilyGuard
 
-    return LauncherEntrypoint(
+    schema = _load_json(files.schema_path)
+    config_check = ConfigCheck(
+        ConfigRepository(files.config_path, ConfigValidator(schema)),
+        RuntimeSettingsFactory(WindowsArgumentParser()),
+    )
+    return LauncherCommand(
         WindowsFamilyGuard(),
         lambda: build_native_bootstrap(files),
-    ).run()
+        config_check,
+    ).run(sys.argv[1:] if argv is None else argv)
 
 
 def _load_json(path):

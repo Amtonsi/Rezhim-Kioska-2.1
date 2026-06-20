@@ -18,6 +18,7 @@ from kiosk_v2_modern.app.effects import RuntimeEffects as ModernEffects
 from kiosk_v2_modern.app.session import LauncherSession as ModernSession
 from kiosk_v2_modern.domain.state_machine import StateMachine as ModernMachine
 from kiosk_v2_modern.launcher import LauncherEntrypoint as ModernLauncherEntrypoint
+from kiosk_v2_modern.launcher import LauncherCommand as ModernLauncherCommand
 from kiosk_v2_modern.launcher import build_native_bootstrap as modern_native_bootstrap
 from kiosk_v2_modern.launcher import resolve_runtime_files as modern_runtime_files
 from kiosk_v2_modern.platform.admin_actions import AdminActionLauncher as ModernAdminActions
@@ -29,6 +30,7 @@ from kiosk_v2_legacy.app.effects import RuntimeEffects as LegacyEffects
 from kiosk_v2_legacy.app.session import LauncherSession as LegacySession
 from kiosk_v2_legacy.domain.state_machine import StateMachine as LegacyMachine
 from kiosk_v2_legacy.launcher import LauncherEntrypoint as LegacyLauncherEntrypoint
+from kiosk_v2_legacy.launcher import LauncherCommand as LegacyLauncherCommand
 from kiosk_v2_legacy.launcher import build_native_bootstrap as legacy_native_bootstrap
 from kiosk_v2_legacy.launcher import resolve_runtime_files as legacy_runtime_files
 from kiosk_v2_legacy.platform.admin_actions import AdminActionLauncher as LegacyAdminActions
@@ -129,6 +131,20 @@ class OrderedApplication(OrderedComponent):
         self.calls.append("application.tick")
 
 
+class OrderedKeyboard(OrderedComponent):
+    def __init__(self, calls):
+        OrderedComponent.__init__(self, calls, "keyboard")
+
+    def start(self):
+        if self.running:
+            return
+        OrderedComponent.start(self)
+
+    def enter_admin_dialog(self):
+        self.calls.append("keyboard.enter_admin_dialog")
+        self.start()
+
+
 class FakeView(object):
     def __init__(self, calls):
         self.calls = calls
@@ -198,11 +214,23 @@ class FakeAuth(object):
 
 
 class FakeGuard(object):
-    def __init__(self, calls):
+    def __init__(self, calls, error=None):
         self.calls = calls
+        self.error = error
 
     def check(self):
         self.calls.append("guard")
+        if self.error is not None:
+            raise self.error
+
+
+class FakeConfigCheck(object):
+    def __init__(self, calls):
+        self.calls = calls
+
+    def run(self):
+        self.calls.append("config.check")
+        return 0
 
 
 class FakeBootstrap(object):
@@ -310,6 +338,39 @@ class BootstrapTests(unittest.TestCase):
                 ["guard", "bootstrap.factory", "bootstrap.run"],
                 calls,
             )
+
+    def test_safe_launcher_commands_never_build_or_start_runtime(self):
+        for command_class in (ModernLauncherCommand, LegacyLauncherCommand):
+            calls = []
+
+            def bootstrap_factory():
+                calls.append("bootstrap.factory")
+                return FakeBootstrap(calls)
+
+            command = command_class(
+                FakeGuard(calls),
+                bootstrap_factory,
+                FakeConfigCheck(calls),
+            )
+            self.assertEqual(0, command.run(["--platform-check"]))
+            self.assertEqual(["guard"], calls)
+
+            calls[:] = []
+            self.assertEqual(0, command.run(["--check-config"]))
+            self.assertEqual(["guard", "config.check"], calls)
+            self.assertNotIn("bootstrap.factory", calls)
+
+    def test_safe_platform_check_returns_code_without_building_on_wrong_family(self):
+        for command_class in (ModernLauncherCommand, LegacyLauncherCommand):
+            calls = []
+            command = command_class(
+                FakeGuard(calls, RuntimeError("wrong family")),
+                lambda: FakeBootstrap(calls),
+                FakeConfigCheck(calls),
+            )
+
+            self.assertEqual(4, command.run(["--platform-check"]))
+            self.assertEqual(["guard"], calls)
 
     def test_restore_entrypoint_delegates_without_launcher_runtime(self):
         for entrypoint_class in (ModernRestoreEntrypoint, LegacyRestoreEntrypoint):
@@ -435,7 +496,7 @@ class SessionTests(unittest.TestCase):
         calls = []
         root = FakeRoot(calls)
         desktop = OrderedComponent(calls, "desktop")
-        keyboard = OrderedComponent(calls, "keyboard")
+        keyboard = OrderedKeyboard(calls)
         application = OrderedApplication(calls)
         view = FakeView(calls)
         restore = FakeRestore(calls)
@@ -491,6 +552,40 @@ class SessionTests(unittest.TestCase):
             self.assertIn("keyboard.stop", calls)
             self.assertIn("desktop.stop", calls)
             self.assertEqual("ADMIN_SESSION", session.controller.state)
+
+    def test_unlock_reasserts_keyboard_guard_before_dialog(self):
+        for family in ("modern", "legacy"):
+            session, calls, _root, _clock = self._build(family)
+            session.start()
+            del calls[:]
+
+            session.handle_action("unlock")
+
+            self.assertEqual(
+                ["keyboard.enter_admin_dialog", "view.dialog"],
+                calls,
+            )
+            self.assertNotIn("keyboard.stop", calls)
+
+    def test_admin_dialog_tick_reasserts_keyboard_guard(self):
+        for family in ("modern", "legacy"):
+            session, calls, _root, _clock = self._build(family)
+            session.start()
+            session.handle_action("unlock")
+            del calls[:]
+
+            session.tick()
+
+            self.assertEqual(
+                [
+                    "keyboard.enter_admin_dialog",
+                    "desktop.tick",
+                    "application.tick",
+                    "view.refresh",
+                ],
+                calls[:4],
+            )
+            self.assertNotIn("keyboard.stop", calls)
 
     def test_failed_auth_returns_to_operator_without_stopping_guards(self):
         for family in ("modern", "legacy"):
