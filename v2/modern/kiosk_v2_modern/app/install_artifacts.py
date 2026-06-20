@@ -36,6 +36,7 @@ class FileArtifactManager(object):
     def capture(self):
         files = []
         owned_paths = []
+        owned_directories = self._missing_target_directories()
         for _source, target in self.artifacts:
             existed = os.path.isfile(target)
             data = self._read_bytes(target) if existed else b""
@@ -54,6 +55,7 @@ class FileArtifactManager(object):
             "schemaVersion": 1,
             "files": files,
             "ownedPaths": owned_paths,
+            "ownedDirectories": owned_directories,
         }
         self._last_snapshot = copy.deepcopy(snapshot)
         return copy.deepcopy(snapshot)
@@ -87,6 +89,7 @@ class FileArtifactManager(object):
                 self._atomic_write(path, data)
             elif os.path.exists(path):
                 os.remove(path)
+        self._remove_owned_directories(snapshot)
 
     def verify_snapshot(self, snapshot):
         records = self._validated_records(snapshot)
@@ -110,19 +113,21 @@ class FileArtifactManager(object):
             normalized = self._require_exact_target(path)
             if os.path.isfile(normalized):
                 os.remove(normalized)
+        self._remove_owned_directories(snapshot)
 
     def _validated_records(self, snapshot):
         if not isinstance(snapshot, dict) or set(snapshot) != {
             "schemaVersion",
             "files",
             "ownedPaths",
+            "ownedDirectories",
         }:
             raise InvalidArtifactSnapshot("invalid artifact snapshot fields")
         if snapshot["schemaVersion"] != 1:
             raise InvalidArtifactSnapshot("unsupported artifact snapshot")
         if not isinstance(snapshot["files"], list) or not isinstance(
             snapshot["ownedPaths"], list
-        ):
+        ) or not isinstance(snapshot["ownedDirectories"], list):
             raise InvalidArtifactSnapshot("invalid artifact snapshot collections")
         expected_targets = {target for _source, target in self.artifacts}
         records = []
@@ -161,7 +166,39 @@ class FileArtifactManager(object):
         owned = {self._require_exact_target(path) for path in snapshot["ownedPaths"]}
         if owned != absent:
             raise InvalidArtifactSnapshot("owned path set mismatch")
+        for directory in snapshot["ownedDirectories"]:
+            self._require_approved(directory)
         return records
+
+    def _missing_target_directories(self):
+        missing = set()
+        for _source, target in self.artifacts:
+            current = os.path.dirname(target)
+            while any(
+                current == root or current.startswith(root + os.sep)
+                for root in self.approved_roots
+            ):
+                if os.path.isdir(current):
+                    break
+                missing.add(current)
+                parent = os.path.dirname(current)
+                if parent == current:
+                    break
+                current = parent
+        return sorted(missing, key=len, reverse=True)
+
+    def _remove_owned_directories(self, snapshot):
+        directories = sorted(
+            (self._require_approved(path) for path in snapshot["ownedDirectories"]),
+            key=len,
+            reverse=True,
+        )
+        for directory in directories:
+            if os.path.isdir(directory):
+                try:
+                    os.rmdir(directory)
+                except OSError:
+                    pass
 
     def _require_exact_target(self, path):
         normalized = self._require_approved(path)

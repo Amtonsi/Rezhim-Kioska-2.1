@@ -266,8 +266,6 @@ class InstallService(object):
             raise ValueError("operatorUser is required")
         if not str(launcher_command or "").strip():
             raise ValueError("launcher command is required")
-        if not os.path.isfile(self.launcher_path):
-            raise ValueError("launcher executable does not exist")
         return operator_user, allowed_path
 
     def _is_inside_install_directory(self, path):

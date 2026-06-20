@@ -100,6 +100,7 @@ class InstallArtifactTests(unittest.TestCase):
             with open(target_a, "rb") as stream:
                 self.assertEqual(b"old launcher", stream.read())
             self.assertFalse(os.path.exists(target_b))
+            self.assertFalse(os.path.exists(os.path.dirname(target_b)))
             self.assertTrue(manager.verify_snapshot(snapshot))
 
     def test_partial_install_failure_restores_all_previous_targets(self):

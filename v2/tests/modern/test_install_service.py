@@ -251,6 +251,19 @@ class InstallServiceTests(unittest.TestCase):
                 self.assertNotIn("capture_acl:" + external_name, calls)
                 self.assertNotIn("protect_acl:" + external_name, calls)
 
+    def test_clean_install_allows_launcher_target_to_be_created_by_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, calls, app_path = self.make_fixture(directory)
+            os.remove(service.launcher_path)
+
+            result = service.apply(
+                config_for(app_path),
+                launcher_command='"{0}"'.format(service.launcher_path),
+            )
+
+            self.assertTrue(result.succeeded)
+            self.assertIn("install_artifacts", calls)
+
     def test_missing_or_non_exe_allowed_application_aborts_before_backup(self):
         with tempfile.TemporaryDirectory() as directory:
             service, calls, _ = self.make_fixture(directory)
