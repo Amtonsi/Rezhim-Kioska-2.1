@@ -287,6 +287,23 @@ class LegacyRuntimeTests(unittest.TestCase):
         self.assertEqual([(100, False)], windows.restore_calls)
         self.assertEqual(1, supervisor.start_calls)
 
+    def test_application_runtime_resume_supervision_starts_and_activates(self):
+        supervisor = FakeSupervisor()
+        windows = FakeWindowApi()
+        runtime = ApplicationRuntime(
+            supervisor,
+            WindowCoordinator(windows),
+            start_maximized=False,
+        )
+
+        resumed = runtime.resume_supervision()
+
+        self.assertEqual("started", resumed.process_status)
+        self.assertEqual(10, resumed.pid)
+        self.assertEqual("visible", resumed.window_status)
+        self.assertEqual([100], windows.foreground_calls)
+        self.assertEqual(1, supervisor.start_calls)
+
 
 if __name__ == "__main__":
     unittest.main()

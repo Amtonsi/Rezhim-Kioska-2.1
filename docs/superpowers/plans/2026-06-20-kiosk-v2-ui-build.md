@@ -27,11 +27,11 @@
 
 ### Task 3: Modern and Legacy Composition Roots
 
-- [ ] Write startup-order tests proving DPI setup precedes Tk, guards start before the allowed app, config is validated, and controller owns transitions.
-- [ ] Compose Modern adapters and independent Legacy adapters into launcher entry points. Do not import V1 or the other build.
-- [ ] Compose separate Restore entry points using backup/registry/ACL/artifact/recovery adapters without launcher/UI imports.
-- [ ] Add bounded periodic ticks for desktop isolation, process supervision, admin timeout, and UI status.
-- [ ] Run all runtime tests; commit `feat: compose kiosk v2 launchers`.
+- [x] Write startup-order tests proving DPI setup precedes Tk, guards start before the allowed app, config is validated, and controller owns transitions.
+- [x] Compose Modern adapters and independent Legacy adapters into launcher entry points. Do not import V1 or the other build.
+- [x] Compose separate Restore entry points using backup/registry/ACL/artifact/recovery adapters without launcher/UI imports.
+- [x] Add bounded periodic ticks for desktop isolation, process supervision, admin timeout, and UI status.
+- [x] Run all runtime tests; commit `feat: compose kiosk v2 launchers`.
 
 ### Task 4: Frozen Builds and Release Package
 

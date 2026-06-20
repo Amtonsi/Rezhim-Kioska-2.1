@@ -273,11 +273,12 @@ class LocalAdminDialog(object):
     def submit(self):
         username = self.username_entry.get().strip()
         password = self.password_entry.get()
+        self.password_entry.delete(0, self.tk.END)
+        self.close()
         try:
             self.on_submit(username, password)
         finally:
-            self.password_entry.delete(0, self.tk.END)
-        self.close()
+            password = None
 
     def cancel(self):
         self.password_entry.delete(0, self.tk.END)
@@ -310,6 +311,9 @@ class KioskCanvasView(object):
         self.tk = tk_module
         self.admin_session_active = False
         self.dialog = None
+        self.auth_error_message = (
+            "Отказано в доступе. Неверное имя пользователя или пароль."
+        )
         root.configure(bg=THEME["background"])
         root.title("Режим киоска")
         root.attributes("-fullscreen", True)
@@ -347,9 +351,12 @@ class KioskCanvasView(object):
     def show_auth_error(self):
         messagebox.showerror(
             "Режим киоска",
-            "Отказано в доступе. Неверное имя пользователя, пароль или права администратора.",
+            self.auth_error_message,
             parent=self.root,
         )
+
+    def set_auth_error(self, message):
+        self.auth_error_message = message
 
     def show_restore_result(self):
         messagebox.showinfo(

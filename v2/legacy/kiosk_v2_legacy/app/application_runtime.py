@@ -69,6 +69,17 @@ class ApplicationRuntime(object):
         self._pending_activation_pid = None
         return self._result(process, "no_window")
 
+    def resume_supervision(self):
+        process = self.supervisor.start()
+        if process.status == "started" and process.pid is not None:
+            self._pending_activation_pid = process.pid
+            return self._observe(process, False, False)
+        self._pending_activation_pid = None
+        window_status = "no_window"
+        if process.pid is not None:
+            window_status = self.window_coordinator.inspect(process.pid).status
+        return self._result(process, window_status)
+
     def _observe(self, process, admin_dialog_open, admin_session_active):
         if process.pid is None:
             if process.status != "waiting_restart":
