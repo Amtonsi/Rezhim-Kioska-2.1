@@ -52,12 +52,12 @@
 
 ### Task 4: Modern Install, Repair, Restore, and Recovery
 
-- [ ] Write failure-injection tests for every install boundary: preflight, backup, file ACL, policies, verification, shell-last, backup persistence, and final verification.
-- [ ] Implement `InstallService.plan()` as a side-effect-free ordered description and `apply()` as one transaction. Capture backup before the first write, apply shell last, verify exact SID and values, and preserve backup evidence on failure.
-- [ ] Write restore tests proving invalid digest/build/SID/path aborts before writes, exact values/ACLs return, originally absent values are deleted, all recoverable items are attempted, and failures remain reported.
-- [ ] Implement independent `RestoreService`; it must not import launcher/controller/UI modules. `recover_desktop()` restores the current session surfaces and starts one Explorer only when no shell exists.
-- [ ] Implement repair as verified re-application from current config without replacing the original pre-install backup. Implement uninstall as restore plus removal of V2-owned files only after successful restore.
-- [ ] Run full V2 tests and commit `feat: install and restore kiosk v2 Modern`.
+- [x] Write failure-injection tests for every install boundary: preflight, backup, file ACL, policies, verification, shell-last, backup persistence, and final verification.
+- [x] Implement `InstallService.plan()` as a side-effect-free ordered description and `apply()` as one transaction. Capture backup before the first write, apply shell last, verify exact SID and values, and preserve backup evidence on failure.
+- [x] Write restore tests proving invalid digest/build/SID/path aborts before writes, exact values/ACLs return, originally absent values are deleted, all recoverable items are attempted, and failures remain reported.
+- [x] Implement independent `RestoreService`; it does not import launcher/controller/UI modules. `recover_desktop()` restores the current session surfaces and starts one Explorer only when no shell exists.
+- [x] Implement repair as verified re-application from current config without replacing the original pre-install backup. Implement uninstall as restore plus removal of V2-owned files only after successful restore.
+- [x] Run full V2 tests and commit `feat: install and restore kiosk v2 Modern`.
 
 ### Task 5: Independent XP/Server 2003 Install and Restore
 

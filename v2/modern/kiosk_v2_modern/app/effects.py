@@ -34,7 +34,7 @@ class RuntimeEffects(object):
             "stop_desktop_isolation": self.desktop.start,
             "start_keyboard_guard": self.keyboard.stop,
             "stop_keyboard_guard": self.keyboard.start,
-            "start_supervisor": self.supervisor.stop,
+            "start_supervisor": self.supervisor.stop_supervision,
         }
         action = actions.get(name)
         if action is not None:

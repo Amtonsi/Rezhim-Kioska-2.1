@@ -9,6 +9,7 @@ V2_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file
 sys.path.insert(0, os.path.join(V2_ROOT, "modern"))
 
 from kiosk_v2_modern.app.controller import AppController, EffectExecutionError
+from kiosk_v2_modern.app.effects import RuntimeEffects
 from kiosk_v2_modern.domain.state_machine import StateMachine
 
 
@@ -63,6 +64,53 @@ class FakeAudit(object):
 
 
 class AppControllerTests(unittest.TestCase):
+    def test_supervisor_start_rollback_stops_supervision_without_terminating_app(self):
+        calls = []
+
+        class Stub(object):
+            def start(self):
+                pass
+
+            def stop(self):
+                pass
+
+            def run(self):
+                pass
+
+            def show_operator(self):
+                pass
+
+            def show_admin_dialog(self):
+                pass
+
+            def show_auth_error(self):
+                pass
+
+            def show_admin_session(self):
+                pass
+
+            def show_restore_result(self):
+                pass
+
+        class Supervisor(object):
+            def start(self):
+                calls.append("start")
+
+            def stop_supervision(self):
+                calls.append("stop_supervision")
+
+        effects = RuntimeEffects(
+            desktop=Stub(),
+            keyboard=Stub(),
+            supervisor=Supervisor(),
+            view=Stub(),
+            restore=Stub(),
+        )
+
+        effects.rollback("start_supervisor")
+
+        self.assertEqual(["stop_supervision"], calls)
+
     def test_successful_transition_emits_safe_structured_audit_event(self):
         effects = FakeEffects()
         audit = FakeAudit()
