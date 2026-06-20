@@ -61,10 +61,10 @@
 
 ### Task 5: Independent XP/Server 2003 Install and Restore
 
-- [ ] Recreate Task 1-4 tests against Legacy imports and run them on Python 2.7 x86 first.
-- [ ] Implement independent Python 2.7-compatible modules with no `dataclasses`, `pathlib`, f-strings, `os.replace`, `subprocess.run`, or Modern imports. Use `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)` for atomic replacement.
-- [ ] Use only XP-compatible registry, NetAPI, Advapi32, and shell APIs; keep the same backup schema and behavior.
-- [ ] Run Python 2.7 Legacy tests, Python 3.8 full parity tests, source compatibility scan, then commit `feat: install and restore kiosk v2 Legacy`.
+- [x] Recreate Task 1-4 tests against Legacy imports and run them on Python 2.7 x86 first.
+- [x] Implement independent Python 2.7-compatible modules with no `dataclasses`, `pathlib`, f-strings, `os.replace`, `subprocess.run`, or Modern imports. Use `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)` for atomic replacement.
+- [x] Use only XP-compatible registry, NetAPI, Advapi32, and shell APIs; keep the same backup schema and behavior.
+- [x] Run Python 2.7 Legacy tests, Python 3.8 full parity tests, source compatibility scan, then commit `feat: install and restore kiosk v2 Legacy`.
 
 ### Task 6: Safe Commands, Scripts, and Acceptance Documentation
 
