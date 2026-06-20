@@ -19,11 +19,11 @@
 
 ### Task 2: Operator and Administrator Views
 
-- [ ] Write fake-canvas tests for operator status, minimized notice/restore button, unlock button, admin-session controls, and degraded isolation message.
-- [ ] Implement independent Tk/Canvas views that render the approved dark interface, square blue `РК` logo, fixed year badge, allowed-app panel, unlock panel, safety footer, and developer line.
-- [ ] Implement the modal local-username/password dialog with visible username input and `*` masking. Keep the keyboard guard running while the dialog is open.
-- [ ] Bind buttons once, keep the kiosk background below the allowed app and dialog, and expose only controller commands.
-- [ ] Run view tests and screenshot layout checks; commit `feat: render kiosk v2 Russian interface`.
+- [x] Write fake-canvas tests for operator status, minimized notice/restore button, unlock button, admin-session controls, and degraded isolation message.
+- [x] Implement independent Tk/Canvas views that render the approved dark interface, square blue `РК` logo, fixed year badge, allowed-app panel, unlock panel, safety footer, and developer line.
+- [x] Implement the modal local-username/password dialog with visible username input and `*` masking. Keep the keyboard guard running while the dialog is open.
+- [x] Bind buttons once, keep the kiosk background below the allowed app and dialog, and expose only controller commands.
+- [x] Run view tests and screenshot layout checks; commit `feat: render kiosk v2 Russian interface`.
 
 ### Task 3: Modern and Legacy Composition Roots
 
