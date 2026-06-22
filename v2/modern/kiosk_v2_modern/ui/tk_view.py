@@ -301,6 +301,7 @@ class KioskCanvasView(object):
         action_handler,
         auth_submit,
         auth_cancel,
+        shell_interaction=None,
         tk_module=tk,
     ):
         self.root = root
@@ -308,12 +309,14 @@ class KioskCanvasView(object):
         self.action_handler = action_handler
         self.auth_submit = auth_submit
         self.auth_cancel = auth_cancel
+        self.shell_interaction = shell_interaction or (lambda: None)
         self.tk = tk_module
         self.admin_session_active = False
         self.dialog = None
         self.auth_error_message = (
             "Отказано в доступе. Неверное имя пользователя или пароль."
         )
+        self.restore_error_message = "Восстановление Windows не выполнено."
         root.configure(bg=THEME["background"])
         root.title("Режим киоска")
         root.attributes("-fullscreen", True)
@@ -326,6 +329,7 @@ class KioskCanvasView(object):
         )
         self.canvas.pack(fill=tk_module.BOTH, expand=True)
         self.renderer = SceneRenderer(self.canvas, self._dispatch)
+        self.canvas.bind("<Button-1>", self._on_shell_click, add="+")
         root.bind("<Configure>", self._on_resize)
 
     def show_operator(self):
@@ -358,6 +362,16 @@ class KioskCanvasView(object):
     def set_auth_error(self, message):
         self.auth_error_message = message
 
+    def show_restore_error(self):
+        messagebox.showerror(
+            "Режим киоска",
+            self.restore_error_message,
+            parent=self.root,
+        )
+
+    def set_restore_error(self, message):
+        self.restore_error_message = message
+
     def show_restore_result(self):
         messagebox.showinfo(
             "Режим киоска",
@@ -370,6 +384,7 @@ class KioskCanvasView(object):
         scene = build_operator_scene(
             model.get("application_path", ""),
             app_status=model.get("app_status", "running"),
+            application_configured=model.get("application_configured", True),
             admin_session_active=self.admin_session_active,
             supervision_enabled=model.get("supervision_enabled", True),
             isolation_degraded=model.get("isolation_degraded", False),
@@ -383,6 +398,24 @@ class KioskCanvasView(object):
 
     def _dispatch(self, action):
         self.action_handler(action)
+
+    def _on_shell_click(self, _event):
+        if self._current_item_is_action():
+            return
+        self.root.after(0, self.shell_interaction)
+
+    def _current_item_is_action(self):
+        canvas = getattr(self, "canvas", None)
+        if canvas is None:
+            return False
+        try:
+            current = canvas.find_withtag("current")
+            if not current:
+                return False
+            tags = canvas.gettags(current[0])
+        except Exception:
+            return False
+        return any(str(tag).startswith("action:") for tag in tags)
 
     def _submit_credentials(self, username, password):
         self.dialog = None

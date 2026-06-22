@@ -83,6 +83,47 @@ class OperatorSceneTests(unittest.TestCase):
                 by_name(scene)["toggle_supervision_button"]["text"],
             )
 
+    def test_unconfigured_scene_guides_admin_without_exposing_picker(self):
+        for build in SCENE_BUILDERS:
+            scene = build(
+                r"F:\Missing\Telegram.exe",
+                application_configured=False,
+            )
+            items = by_name(scene)
+            self.assertEqual("Не выбрано", items["application_name"]["text"])
+            self.assertEqual("Не настроено", items["application_status"]["text"])
+            self.assertEqual(
+                "Надзор: ожидает настройки",
+                items["supervision_status"]["text"],
+            )
+            self.assertIn(
+                "Разблокируйте режим и выберите разрешенное приложение.",
+                all_text(scene),
+            )
+            actions = set(
+                item["action"] for item in scene if item.get("action") is not None
+            )
+            self.assertEqual({"unlock"}, actions)
+
+    def test_unconfigured_admin_session_exposes_selection_without_supervision(self):
+        expected = {
+            "unlockDesktop",
+            "returnToKiosk",
+            "changeApplication",
+            "restore",
+        }
+        for build in SCENE_BUILDERS:
+            scene = build(
+                r"F:\Missing\Telegram.exe",
+                admin_session_active=True,
+                application_configured=False,
+            )
+            actions = set(
+                item["action"] for item in scene if item.get("action") is not None
+            )
+            self.assertEqual(expected, actions)
+            self.assertNotIn("toggle_supervision_button", by_name(scene))
+
     def test_degraded_isolation_is_explicit_and_does_not_claim_full_protection(self):
         for build in SCENE_BUILDERS:
             normal_text = all_text(build(r"C:\Tools\Allowed.exe"))

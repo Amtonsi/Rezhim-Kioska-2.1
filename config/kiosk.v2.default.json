@@ -2,6 +2,7 @@
   "schemaVersion": 2,
   "operatorUser": "KioskOperator",
   "allowedApplication": {
+    "configured": false,
     "path": "C:\\Windows\\System32\\notepad.exe",
     "arguments": "",
     "workingDirectory": "C:\\Windows\\System32",

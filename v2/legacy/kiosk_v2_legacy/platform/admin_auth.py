@@ -9,11 +9,18 @@ from ctypes import wintypes
 ERROR_LOGON_FAILURE = 1326
 ERROR_ACCOUNT_DISABLED = 1331
 ERROR_NO_IMPERSONATION_TOKEN = 1309
+NERR_SUCCESS = 0
 LOGON32_LOGON_INTERACTIVE = 2
 LOGON32_PROVIDER_DEFAULT = 0
 SECURITY_IMPERSONATION = 2
 WIN_BUILTIN_ADMINISTRATORS_SID = 26
 SECURITY_MAX_SID_SIZE = 68
+LG_INCLUDE_INDIRECT = 0x0001
+MAX_PREFERRED_LENGTH = 0xFFFFFFFF
+
+
+class LOCALGROUP_USERS_INFO_0(ctypes.Structure):
+    _fields_ = [("lgrui0_name", wintypes.LPWSTR)]
 
 
 class WindowsAuthError(Exception):
@@ -51,7 +58,7 @@ class WindowsAdminAuth(object):
         token = None
         try:
             token = self.api.logon_local(username, password)
-            if not self.api.is_local_administrator(token):
+            if not self._is_local_administrator(username, token):
                 return AuthResult(False, "not_administrator", username)
             return AuthResult(True, "success", username)
         except WindowsAuthError as error:
@@ -71,6 +78,15 @@ class WindowsAdminAuth(object):
             separator in username for separator in ("\\", "/", "@")
         )
 
+    def _is_local_administrator(self, username, token):
+        if hasattr(self.api, "user_in_local_administrators"):
+            try:
+                if self.api.user_in_local_administrators(username):
+                    return True
+            except WindowsAuthError:
+                pass
+        return self.api.is_local_administrator(token)
+
     @staticmethod
     def _code_for_windows_error(code):
         if int(code) == ERROR_LOGON_FAILURE:
@@ -81,9 +97,10 @@ class WindowsAdminAuth(object):
 
 
 class NativeAuthApi(object):
-    def __init__(self, advapi32=None, kernel32=None):
+    def __init__(self, advapi32=None, kernel32=None, netapi32=None):
         self.advapi32 = advapi32 or ctypes.windll.advapi32
         self.kernel32 = kernel32 or ctypes.windll.kernel32
+        self.netapi32 = netapi32 or ctypes.windll.netapi32
         self._configure_signatures()
 
     def _configure_signatures(self):
@@ -115,6 +132,29 @@ class NativeAuthApi(object):
             ctypes.POINTER(wintypes.HANDLE),
         ]
         self.advapi32.DuplicateToken.restype = wintypes.BOOL
+        self.advapi32.LookupAccountSidW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.LPVOID,
+            wintypes.LPWSTR,
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.LPWSTR,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        self.advapi32.LookupAccountSidW.restype = wintypes.BOOL
+        self.netapi32.NetUserGetLocalGroups.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.LPVOID),
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        self.netapi32.NetUserGetLocalGroups.restype = wintypes.DWORD
+        self.netapi32.NetApiBufferFree.argtypes = [wintypes.LPVOID]
+        self.netapi32.NetApiBufferFree.restype = wintypes.DWORD
         self.kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
         self.kernel32.CloseHandle.restype = wintypes.BOOL
 
@@ -147,6 +187,15 @@ class NativeAuthApi(object):
     def close_token(self, token):
         self._close_handle(token)
 
+    def user_in_local_administrators(self, username):
+        administrators_group = self._localized_administrators_group_name()
+        groups = self._local_group_names_for_user(username)
+        expected = administrators_group.lower()
+        for group in groups:
+            if (group or "").lower() == expected:
+                return True
+        return False
+
     def _create_administrators_sid(self):
         sid = ctypes.create_string_buffer(SECURITY_MAX_SID_SIZE)
         size = wintypes.DWORD(len(sid))
@@ -158,6 +207,56 @@ class NativeAuthApi(object):
         ):
             raise self._error()
         return sid
+
+    def _localized_administrators_group_name(self):
+        sid = self._create_administrators_sid()
+        name = ctypes.create_unicode_buffer(256)
+        name_size = wintypes.DWORD(len(name))
+        domain = ctypes.create_unicode_buffer(256)
+        domain_size = wintypes.DWORD(len(domain))
+        sid_type = wintypes.DWORD()
+        if not self.advapi32.LookupAccountSidW(
+            None,
+            sid,
+            name,
+            ctypes.byref(name_size),
+            domain,
+            ctypes.byref(domain_size),
+            ctypes.byref(sid_type),
+        ):
+            return "Administrators"
+        return name.value or "Administrators"
+
+    def _local_group_names_for_user(self, username):
+        buffer = wintypes.LPVOID()
+        entries_read = wintypes.DWORD()
+        total_entries = wintypes.DWORD()
+        status = int(
+            self.netapi32.NetUserGetLocalGroups(
+                None,
+                username,
+                0,
+                LG_INCLUDE_INDIRECT,
+                ctypes.byref(buffer),
+                MAX_PREFERRED_LENGTH,
+                ctypes.byref(entries_read),
+                ctypes.byref(total_entries),
+            )
+        )
+        if status != NERR_SUCCESS:
+            raise WindowsAuthError(status)
+        try:
+            group_array = ctypes.cast(
+                buffer,
+                ctypes.POINTER(LOCALGROUP_USERS_INFO_0 * entries_read.value),
+            ).contents
+            return [
+                group_array[index].lgrui0_name
+                for index in range(entries_read.value)
+            ]
+        finally:
+            if buffer:
+                self.netapi32.NetApiBufferFree(buffer)
 
     def _check_token_membership(self, token, sid):
         is_member = wintypes.BOOL()

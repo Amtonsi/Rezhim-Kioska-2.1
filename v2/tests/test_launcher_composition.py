@@ -16,6 +16,7 @@ from kiosk_v2_modern.app.bootstrap import LauncherBootstrap as ModernBootstrap
 from kiosk_v2_modern.app.controller import AppController as ModernController
 from kiosk_v2_modern.app.effects import RuntimeEffects as ModernEffects
 from kiosk_v2_modern.app.session import LauncherSession as ModernSession
+import kiosk_v2_modern.app.session as modern_session_module
 from kiosk_v2_modern.domain.state_machine import StateMachine as ModernMachine
 from kiosk_v2_modern.launcher import LauncherEntrypoint as ModernLauncherEntrypoint
 from kiosk_v2_modern.launcher import LauncherCommand as ModernLauncherCommand
@@ -28,6 +29,7 @@ from kiosk_v2_legacy.app.bootstrap import LauncherBootstrap as LegacyBootstrap
 from kiosk_v2_legacy.app.controller import AppController as LegacyController
 from kiosk_v2_legacy.app.effects import RuntimeEffects as LegacyEffects
 from kiosk_v2_legacy.app.session import LauncherSession as LegacySession
+import kiosk_v2_legacy.app.session as legacy_session_module
 from kiosk_v2_legacy.domain.state_machine import StateMachine as LegacyMachine
 from kiosk_v2_legacy.launcher import LauncherEntrypoint as LegacyLauncherEntrypoint
 from kiosk_v2_legacy.launcher import LauncherCommand as LegacyLauncherCommand
@@ -76,6 +78,9 @@ class FakeRoot(object):
         self.after_calls.append((milliseconds, callback))
         return len(self.after_calls)
 
+    def destroy(self):
+        self.calls.append("root.destroy")
+
 
 class FakeBuiltSession(object):
     def __init__(self, calls):
@@ -104,6 +109,21 @@ class OrderedComponent(object):
 
     def tick(self):
         self.calls.append(self.name + ".tick")
+
+
+class IsolationResult(object):
+    def __init__(self, fallback_active=False):
+        self.failed_pids = ()
+        self.fallback_active = bool(fallback_active)
+
+
+class FallbackDesktop(OrderedComponent):
+    def __init__(self, calls):
+        OrderedComponent.__init__(self, calls, "desktop")
+
+    def tick(self):
+        self.calls.append("desktop.tick")
+        return IsolationResult(fallback_active=True)
 
 
 class OrderedApplication(OrderedComponent):
@@ -180,10 +200,15 @@ class FakeRestore(object):
 
 
 class FakeRecovery(object):
+    def __init__(self, calls):
+        self.calls = calls
+
     def restore_shell_surfaces(self):
+        self.calls.append("recovery.restore_shell_surfaces")
         return ()
 
     def start_explorer(self):
+        self.calls.append("recovery.start_explorer")
         return True
 
 
@@ -211,6 +236,16 @@ class FakeAuth(object):
 
     def authenticate(self, username, password):
         return self.result
+
+
+class SelectionSettings(object):
+    def __init__(self, configured):
+        self.application_configured = bool(configured)
+        self.application = type(
+            "Application",
+            (),
+            {"path": r"F:\Missing\Telegram.exe"},
+        )()
 
 
 class FakeGuard(object):
@@ -308,7 +343,7 @@ class BootstrapTests(unittest.TestCase):
             bootstrap.run()
             self.assertEqual(
                 [
-                    ("config", True),
+                    ("config", False),
                     ("settings", "test"),
                     "dpi",
                     "tk",
@@ -319,6 +354,46 @@ class BootstrapTests(unittest.TestCase):
                 ],
                 calls,
             )
+
+    def test_unconfigured_application_never_starts_or_controls_processes(self):
+        for module in (modern_session_module, legacy_session_module):
+            application_class = getattr(module, "UnconfiguredApplication", None)
+            self.assertIsNotNone(application_class)
+            application = application_class(r"F:\Missing\Telegram.exe")
+
+            self.assertFalse(application.configured)
+            self.assertFalse(application.enabled)
+            self.assertIsNone(application.start())
+            self.assertIsNone(application.tick())
+            self.assertIsNone(application.restore_application())
+            self.assertIsNone(application.bring_to_front())
+            self.assertIsNone(application.stop_supervision())
+            self.assertIsNone(application.resume_supervision())
+
+    def test_application_selection_uses_safe_adapter_for_missing_executable(self):
+        for module in (modern_session_module, legacy_session_module):
+            select = getattr(module, "select_application", None)
+            self.assertIsNotNone(select)
+            selected = select(
+                SelectionSettings(True),
+                file_exists=lambda _path: False,
+                configured_factory=lambda _settings: self.fail(
+                    "must not build supervisor"
+                ),
+            )
+            self.assertFalse(selected.configured)
+
+    def test_application_selection_builds_configured_runtime_once(self):
+        for module in (modern_session_module, legacy_session_module):
+            select = getattr(module, "select_application", None)
+            self.assertIsNotNone(select)
+            sentinel = object()
+            selected = select(
+                SelectionSettings(True),
+                file_exists=lambda _path: True,
+                configured_factory=lambda _settings: sentinel,
+            )
+            self.assertIs(sentinel, selected)
 
     def test_family_guard_precedes_launcher_composition_for_both_builds(self):
         for entrypoint_class in (ModernLauncherEntrypoint, LegacyLauncherEntrypoint):
@@ -371,6 +446,35 @@ class BootstrapTests(unittest.TestCase):
 
             self.assertEqual(4, command.run(["--platform-check"]))
             self.assertEqual(["guard"], calls)
+
+    def test_config_check_returns_code_without_fatal_error_on_wrong_family(self):
+        for command_class in (ModernLauncherCommand, LegacyLauncherCommand):
+            calls = []
+            command = command_class(
+                FakeGuard(calls, RuntimeError("wrong family")),
+                lambda: FakeBootstrap(calls),
+                FakeConfigCheck(calls),
+            )
+
+            self.assertEqual(4, command.run(["--check-config"]))
+            self.assertEqual(["guard"], calls)
+            self.assertNotIn("config.check", calls)
+
+    def test_interactive_wrong_family_reports_error_without_building_runtime(self):
+        for command_class in (ModernLauncherCommand, LegacyLauncherCommand):
+            calls = []
+            messages = []
+            command = command_class(
+                FakeGuard(calls, RuntimeError("wrong Windows family")),
+                lambda: FakeBootstrap(calls),
+                FakeConfigCheck(calls),
+                error_handler=messages.append,
+            )
+
+            self.assertEqual(4, command.run([]))
+            self.assertEqual(["guard"], calls)
+            self.assertEqual(["wrong Windows family"], messages)
+            self.assertNotIn("bootstrap.factory", calls)
 
     def test_restore_entrypoint_delegates_without_launcher_runtime(self):
         for entrypoint_class in (ModernRestoreEntrypoint, LegacyRestoreEntrypoint):
@@ -428,7 +532,7 @@ class BootstrapTests(unittest.TestCase):
 
             self.assertEqual(
                 [
-                    ("Restore.exe", 'restore --apply'),
+                    ("Restore.exe", 'recover-desktop --apply'),
                     ("Configurator.exe", 'configure-application'),
                 ],
                 api.calls,
@@ -490,6 +594,17 @@ class BootstrapTests(unittest.TestCase):
             self.assertTrue(hasattr(bootstrap, "run"))
             self.assertEqual(config_path, bootstrap.config_repository.config_path)
 
+    def test_native_launchers_always_enable_strict_explorer_isolation(self):
+        paths = (
+            os.path.join(V2_ROOT, "modern", "kiosk_v2_modern", "launcher.py"),
+            os.path.join(V2_ROOT, "legacy", "kiosk_v2_legacy", "launcher.py"),
+        )
+        for path in paths:
+            with open(path, "rb") as stream:
+                source = stream.read().decode("utf-8")
+            self.assertNotIn("CurrentShellMode", source)
+            self.assertIn("terminate_explorer=True", source)
+
 
 class SessionTests(unittest.TestCase):
     def _build(self, family, auth_result=None):
@@ -519,7 +634,7 @@ class SessionTests(unittest.TestCase):
             keyboard=keyboard,
             view=view,
             auth=FakeAuth(auth_result or FakeAuthResult(True)),
-            recovery=FakeRecovery(),
+            recovery=FakeRecovery(calls),
             clock=clock,
             admin_timeout_seconds=30,
             tick_interval_ms=250,
@@ -541,6 +656,21 @@ class SessionTests(unittest.TestCase):
             )
             self.assertEqual(1, len(root.after_calls))
 
+    def test_session_model_reports_unconfigured_application(self):
+        for family, module in (
+            ("modern", modern_session_module),
+            ("legacy", legacy_session_module),
+        ):
+            session, _calls, _root, _clock = self._build(family)
+            session.application = module.UnconfiguredApplication(
+                r"F:\Missing\Telegram.exe"
+            )
+
+            model = session.model()
+
+            self.assertFalse(model["application_configured"])
+            self.assertFalse(model["supervision_enabled"])
+
     def test_keyboard_guard_stays_active_during_dialog_and_stops_after_success(self):
         for family in ("modern", "legacy"):
             session, calls, _root, _clock = self._build(family)
@@ -550,8 +680,36 @@ class SessionTests(unittest.TestCase):
             self.assertNotIn("keyboard.stop", calls)
             session.submit_credentials("Administrator", "not-logged")
             self.assertIn("keyboard.stop", calls)
-            self.assertIn("desktop.stop", calls)
+            self.assertNotIn("desktop.stop", calls)
             self.assertEqual("ADMIN_SESSION", session.controller.state)
+
+    def test_admin_session_keeps_desktop_isolation_active(self):
+        for family in ("modern", "legacy"):
+            session, calls, _root, _clock = self._build(family)
+            session.start()
+            session.handle_action("unlock")
+            session.submit_credentials("Administrator", "not-logged")
+            del calls[:]
+
+            session.tick()
+
+            self.assertIn("desktop.tick", calls)
+            self.assertNotIn("desktop.stop", calls)
+            self.assertNotIn("recovery.start_explorer", calls)
+
+    def test_open_desktop_is_an_explicit_exit_that_restores_explorer(self):
+        for family in ("modern", "legacy"):
+            session, calls, _root, _clock = self._build(family)
+            session.start()
+            session.handle_action("unlock")
+            session.submit_credentials("Administrator", "not-logged")
+            del calls[:]
+
+            session.handle_action("unlockDesktop")
+
+            self.assertFalse(session.running)
+            self.assertIn("recovery.start_explorer", calls)
+            self.assertIn("root.destroy", calls)
 
     def test_unlock_reasserts_keyboard_guard_before_dialog(self):
         for family in ("modern", "legacy"):
@@ -616,6 +774,16 @@ class SessionTests(unittest.TestCase):
             self.assertEqual("OPERATOR", session.controller.state)
             self.assertGreaterEqual(calls.count("keyboard.start"), 2)
             self.assertGreaterEqual(calls.count("desktop.start"), 2)
+
+    def test_manual_shell_fallback_is_reported_as_degraded(self):
+        for family in ("modern", "legacy"):
+            session, calls, _root, _clock = self._build(family)
+            session.desktop = FallbackDesktop(calls)
+            session.start()
+
+            session.tick()
+
+            self.assertTrue(session.isolation_degraded)
 
 
 if __name__ == "__main__":

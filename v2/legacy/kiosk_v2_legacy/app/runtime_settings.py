@@ -83,6 +83,7 @@ class TestingSettings(object):
 class RuntimeSettings(object):
     __slots__ = (
         "operator_user",
+        "application_configured",
         "application",
         "window",
         "security",
@@ -93,6 +94,7 @@ class RuntimeSettings(object):
     def __init__(
         self,
         operator_user,
+        application_configured,
         application,
         window,
         security,
@@ -100,6 +102,7 @@ class RuntimeSettings(object):
         testing,
     ):
         self.operator_user = operator_user
+        self.application_configured = bool(application_configured)
         self.application = application
         self.window = window
         self.security = security
@@ -153,6 +156,7 @@ class RuntimeSettingsFactory(object):
         )
         return RuntimeSettings(
             config["operatorUser"],
+            application_data.get("configured", True),
             application,
             window,
             security,

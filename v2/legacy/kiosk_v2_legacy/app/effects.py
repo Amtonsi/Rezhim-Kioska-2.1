@@ -22,6 +22,11 @@ class RuntimeEffects(object):
             "show_auth_error": self.view.show_auth_error,
             "show_admin_session": self.view.show_admin_session,
             "run_restore": self.restore.run,
+            "show_restore_error": getattr(
+                self.view,
+                "show_restore_error",
+                self.view.show_auth_error,
+            ),
             "show_restore_result": self.view.show_restore_result,
         }
         action = actions.get(name)

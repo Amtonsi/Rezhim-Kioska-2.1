@@ -15,6 +15,7 @@ from kiosk_v2_modern.platform.desktop_isolation import (
     WindowsShellSurfaceApi,
     WindowsProcessApi,
 )
+from kiosk_v2_modern.platform.shell_mode import CurrentShellMode
 
 
 class FakeProcessApi(object):
@@ -92,6 +93,21 @@ class FakeNativeProcessApi(object):
         return True
 
 
+class FakeShellRegistry(object):
+    def __init__(self, value):
+        self.value = value
+
+    def read_shell(self):
+        return self.value
+
+
+class FakeArgumentParser(object):
+    def parse(self, value):
+        if value == "malformed":
+            raise ValueError("invalid shell command")
+        return (value.strip('"'),)
+
+
 class TrackingNativeProcessApi(NativeProcessApi):
     def __init__(self):
         self.closed = []
@@ -144,6 +160,48 @@ class DesktopIsolationTests(unittest.TestCase):
 
         self.assertEqual([20], api.terminated)
         self.assertEqual((20,), result.terminated_pids)
+
+    def test_manual_launch_hides_shell_without_restarting_explorer_forever(self):
+        process_api = FakeProcessApi(
+            current_session=7,
+            processes=[ProcessRecord(20, r"C:\Windows\explorer.exe", 7)],
+        )
+        surfaces = FakeSurfaceApi(
+            [ShellSurface(200, "Shell_TrayWnd", 20, 7)]
+        )
+        guard = DesktopIsolation(
+            process_api,
+            surface_api=surfaces,
+            terminate_explorer=False,
+        )
+
+        result = guard.start()
+        guard.tick()
+
+        self.assertEqual([], process_api.terminated)
+        self.assertEqual([200, 200], surfaces.hidden)
+        self.assertTrue(result.fallback_active)
+        guard.stop()
+        self.assertEqual([200], surfaces.shown)
+
+    def test_current_shell_mode_enables_strict_isolation_only_for_launcher(self):
+        launcher = r"C:\ProgramData\Kiosk\KioskLauncher.exe"
+        strict = CurrentShellMode(
+            FakeShellRegistry('"' + launcher + '"'),
+            FakeArgumentParser(),
+        )
+        manual = CurrentShellMode(
+            FakeShellRegistry("explorer.exe"),
+            FakeArgumentParser(),
+        )
+        malformed = CurrentShellMode(
+            FakeShellRegistry("malformed"),
+            FakeArgumentParser(),
+        )
+
+        self.assertTrue(strict.is_launcher_shell(launcher))
+        self.assertFalse(manual.is_launcher_shell(launcher))
+        self.assertFalse(malformed.is_launcher_shell(launcher))
 
     def test_stopped_guard_never_terminates_explorer(self):
         api = FakeProcessApi(

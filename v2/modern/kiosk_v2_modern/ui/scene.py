@@ -74,17 +74,31 @@ def _application_name(path):
 def build_operator_scene(
     application_path,
     app_status="running",
+    application_configured=True,
     admin_session_active=False,
     supervision_enabled=True,
     isolation_degraded=False,
 ):
-    minimized = app_status == "minimized"
-    status_text = "Свернуто" if minimized else "Работает"
-    status_fill = "#3a1616" if minimized else "#0f2f1f"
-    status_color = THEME["danger"] if minimized else THEME["ok"]
-    supervision_text = (
-        "Надзор: включен" if supervision_enabled else "Надзор: остановлен"
-    )
+    application_configured = bool(application_configured)
+    minimized = application_configured and app_status == "minimized"
+    if application_configured:
+        application_name = _application_name(application_path)
+        application_path_text = application_path
+        status_text = "Свернуто" if minimized else "Работает"
+        status_fill = "#3a1616" if minimized else "#0f2f1f"
+        status_color = THEME["danger"] if minimized else THEME["ok"]
+        supervision_text = (
+            "Надзор: включен" if supervision_enabled else "Надзор: остановлен"
+        )
+        hint_text = "Приложение работает поверх оболочки. При сворачивании появится кнопка возврата."
+    else:
+        application_name = "Не выбрано"
+        application_path_text = "Разрешенное приложение не настроено."
+        status_text = "Не настроено"
+        status_fill = "#3a1616"
+        status_color = THEME["danger"]
+        supervision_text = "Надзор: ожидает настройки"
+        hint_text = "Разблокируйте режим и выберите разрешенное приложение."
     scene = [
         _item(
             "background",
@@ -120,8 +134,8 @@ def build_operator_scene(
             THEME["muted"],
         ),
         _rect("application_card", 95, 300, 690, 250, "#0b1220", "#1d4ed8"),
-        _text("application_name", _application_name(application_path), 135, 344, 600, 58, 34, THEME["text"], True),
-        _text("application_path", application_path, 138, 410, 600, 32, 13, THEME["muted"]),
+        _text("application_name", application_name, 135, 344, 600, 58, 34, THEME["text"], True),
+        _text("application_path", application_path_text, 138, 410, 600, 32, 13, THEME["muted"]),
         _rect("application_status_pill", 135, 478, 190, 44, status_fill, None, 8),
         _text("application_status", status_text, 154, 486, 150, 28, 15, status_color),
         _rect("supervision_status_pill", 345, 478, 270, 44, "#122033", None, 8),
@@ -190,7 +204,7 @@ def build_operator_scene(
         scene.append(
             _text(
                 "application_hint",
-                "Приложение работает поверх оболочки. При сворачивании появится кнопка возврата.",
+                hint_text,
                 94,
                 586,
                 720,
@@ -201,7 +215,9 @@ def build_operator_scene(
         )
 
     if admin_session_active:
-        scene.extend(_admin_session_items(supervision_enabled))
+        scene.extend(
+            _admin_session_items(supervision_enabled, application_configured)
+        )
     else:
         scene.extend(
             [
@@ -231,11 +247,13 @@ def build_operator_scene(
     return scene
 
 
-def _admin_session_items(supervision_enabled):
-    return [
+def _admin_session_items(supervision_enabled, application_configured=True):
+    items = [
         _text("admin_session_title", "Админ-сессия активна", 958, 248, 350, 30, 15, THEME["ok"], True),
         _button("unlock_desktop_button", "Открыть рабочий стол", "unlockDesktop", 958, 292, 250, 46, THEME["blue"], "#00111f"),
-        _button(
+    ]
+    if application_configured:
+        items.append(_button(
             "toggle_supervision_button",
             "Остановить надзор" if supervision_enabled else "Запустить надзор",
             "toggleSupervision",
@@ -245,12 +263,14 @@ def _admin_session_items(supervision_enabled):
             46,
             "#242a31" if supervision_enabled else THEME["blue"],
             THEME["text"] if supervision_enabled else "#00111f",
-        ),
+        ))
+    items.extend([
         _button("return_to_kiosk_button", "Вернуться в киоск", "returnToKiosk", 958, 408, 250, 46, "#101820", THEME["accent"], "#374151"),
         _button("change_application_button", "Изменить приложение", "changeApplication", 958, 466, 250, 46, "#242a31", THEME["text"]),
         _button("restore_button", "Восстановить Windows", "restore", 958, 524, 250, 46, "#3a1616", THEME["danger"], "#7f1d1d"),
         _text("admin_timeout_hint", "Админ-сессия завершится автоматически по таймауту.", 958, 590, 360, 56, 12, THEME["muted"]),
-    ]
+    ])
+    return items
 
 
 def build_dialog_spec():

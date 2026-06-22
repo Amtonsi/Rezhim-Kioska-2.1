@@ -99,6 +99,7 @@ class UnsupportedInstallService(object):
 
 
 def build_native_restore_entrypoint(executable_directory=None):
+    from kiosk_v2_legacy.platform.runtime_path import coerce_runtime_directory
     from kiosk_v2_legacy.app.backup_store import BackupStore
     from kiosk_v2_legacy.cli import KioskCli
     from kiosk_v2_legacy.platform.desktop_isolation import LegacyDesktopApi
@@ -108,9 +109,11 @@ def build_native_restore_entrypoint(executable_directory=None):
     from kiosk_v2_legacy.platform.operator_registry import OperatorRegistryStore
     from kiosk_v2_legacy.platform.profile_path import WindowsProfileLocator
 
-    directory = os.path.abspath(
-        executable_directory
-        or os.path.dirname(os.path.abspath(sys.executable))
+    directory = coerce_runtime_directory(
+        os.path.abspath(
+            executable_directory
+            or os.path.dirname(os.path.abspath(sys.executable))
+        )
     )
     backup_path = os.path.join(directory, "state", "backup-v2.json")
     acl = FileAclManager((directory,))

@@ -28,6 +28,7 @@ class FakeAuthApi(object):
     def __init__(self, valid=True, administrator=True):
         self.valid = valid
         self.administrator = administrator
+        self.local_group_administrator = administrator
         self.token = 77
         self.closed = []
         self.calls = []
@@ -40,6 +41,9 @@ class FakeAuthApi(object):
 
     def is_local_administrator(self, token):
         return self.administrator
+
+    def user_in_local_administrators(self, username):
+        return self.local_group_administrator
 
     def close_token(self, token):
         self.closed.append(token)
@@ -111,6 +115,7 @@ class LegacyAuthLoggingTests(unittest.TestCase):
 
     def test_local_admin_auth_rejects_nonadmin_bad_password_and_domain_name(self):
         nonadmin = FakeAuthApi(valid=True, administrator=False)
+        nonadmin.local_group_administrator = False
         result = WindowsAdminAuth(nonadmin).authenticate("User", "secret")
         self.assertEqual("not_administrator", result.code)
         self.assertEqual([77], nonadmin.closed)
@@ -123,6 +128,16 @@ class LegacyAuthLoggingTests(unittest.TestCase):
         result = WindowsAdminAuth(untouched).authenticate("DOMAIN\\Admin", "secret")
         self.assertEqual("invalid_local_username", result.code)
         self.assertEqual([], untouched.calls)
+
+    def test_local_admin_group_accepts_uac_filtered_token(self):
+        api = FakeAuthApi(valid=True, administrator=False)
+        api.local_group_administrator = True
+
+        result = WindowsAdminAuth(api).authenticate("impal", "secret")
+
+        self.assertTrue(result.success)
+        self.assertEqual("success", result.code)
+        self.assertEqual([77], api.closed)
 
     def test_membership_1309_uses_duplicate_and_closes_it(self):
         native = MembershipNative()

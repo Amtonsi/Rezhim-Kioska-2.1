@@ -62,7 +62,6 @@ class KeyboardState(object):
         self.shift_down = False
 
     def sync_modifiers(self, is_down):
-        self.win_down = bool(is_down(VK_LWIN) or is_down(VK_RWIN))
         self.alt_down = bool(
             is_down(VK_MENU) or is_down(VK_LMENU) or is_down(VK_RMENU)
         )

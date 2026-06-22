@@ -8,6 +8,15 @@ import os
 import sys
 
 
+try:
+    text_type = unicode
+except NameError:
+    text_type = str
+
+
+from kiosk_v2_legacy.platform.runtime_path import coerce_runtime_directory
+
+
 class RuntimeFiles(object):
     def __init__(
         self,
@@ -60,10 +69,17 @@ class ConfigCheck(object):
 
 
 class LauncherCommand(object):
-    def __init__(self, family_guard, bootstrap_factory, config_check):
+    def __init__(
+        self,
+        family_guard,
+        bootstrap_factory,
+        config_check,
+        error_handler=None,
+    ):
         self.family_guard = family_guard
         self.bootstrap_factory = bootstrap_factory
         self.config_check = config_check
+        self.error_handler = error_handler or (lambda _message: None)
 
     def run(self, argv):
         arguments = list(argv or ())
@@ -74,14 +90,21 @@ class LauncherCommand(object):
             except Exception:
                 return 4
         if arguments == ["--check-config"]:
-            self.family_guard.check()
+            try:
+                self.family_guard.check()
+            except RuntimeError:
+                return 4
             return self.config_check.run()
         if arguments:
             raise ValueError("Unsupported launcher arguments")
-        return LauncherEntrypoint(
-            self.family_guard,
-            self.bootstrap_factory,
-        ).run()
+        try:
+            return LauncherEntrypoint(
+                self.family_guard,
+                self.bootstrap_factory,
+            ).run()
+        except RuntimeError as error:
+            self.error_handler(text_type(error))
+            return 4
 
 
 class ManagedLauncherSession(object):
@@ -115,7 +138,11 @@ def build_native_bootstrap(files, root_factory=None):
     from kiosk_v2_legacy.app.effects import RuntimeEffects
     from kiosk_v2_legacy.app.process_supervisor import ProcessSupervisor
     from kiosk_v2_legacy.app.runtime_settings import RuntimeSettingsFactory
-    from kiosk_v2_legacy.app.session import LauncherSession, ObservedApplication
+    from kiosk_v2_legacy.app.session import (
+        LauncherSession,
+        ObservedApplication,
+        select_application,
+    )
     from kiosk_v2_legacy.app.window_coordinator import WindowCoordinator
     from kiosk_v2_legacy.domain.state_machine import StateMachine
     from kiosk_v2_legacy.platform.admin_actions import AdminActionLauncher
@@ -150,20 +177,33 @@ def build_native_bootstrap(files, root_factory=None):
     def create_session(root, settings, _config):
         clock = TickCountClock()
         desktop_api = LegacyDesktopApi()
-        desktop = DesktopIsolation(desktop_api)
+        desktop = DesktopIsolation(
+            desktop_api,
+            terminate_explorer=True,
+        )
         recovery = WindowsDesktopRecovery(desktop_api)
         keyboard = KeyboardGuard(NativeHookLoop())
-        supervisor = ProcessSupervisor(
-            settings.application,
-            LegacyProcessRuntime(),
-            clock,
-        )
-        runtime = ApplicationRuntime(
-            supervisor,
-            WindowCoordinator(LegacyWindowApi()),
-            start_maximized=settings.window.start_maximized,
-        )
-        application = ObservedApplication(runtime, settings.application.path)
+        def build_configured_application(runtime_settings):
+            supervisor = ProcessSupervisor(
+                runtime_settings.application,
+                LegacyProcessRuntime(),
+                clock,
+            )
+            runtime = ApplicationRuntime(
+                supervisor,
+                WindowCoordinator(LegacyWindowApi()),
+                start_maximized=runtime_settings.window.start_maximized,
+            )
+            return ObservedApplication(runtime, runtime_settings.application.path)
+
+        def build_application(runtime_settings):
+            return select_application(
+                runtime_settings,
+                os.path.isfile,
+                build_configured_application,
+            )
+
+        application = build_application(settings)
         auth = RateLimitedAdminAuth(WindowsAdminAuth(), clock)
         log_path = os.path.join(
             settings.logging.log_directory,
@@ -180,6 +220,28 @@ def build_native_bootstrap(files, root_factory=None):
             files.configurator_executable,
         )
         holder = {}
+
+        def change_application():
+            current_application = holder["session"].application
+            current_path = ntpath.normcase(
+                ntpath.normpath(current_application.application_path)
+            )
+            admin_actions.change_application()
+            updated = settings_factory.build(
+                repository.load(require_existing_app=False)
+            )
+            updated_path = ntpath.normcase(
+                ntpath.normpath(updated.application.path)
+            )
+            replacement = build_application(updated)
+            same_path = updated_path == current_path
+            same_state = bool(replacement.configured) == bool(
+                current_application.configured
+            )
+            if same_path and same_state:
+                return None
+            return replacement
+
         view = KioskCanvasView(
             root,
             model_provider=lambda: holder["session"].model(),
@@ -189,6 +251,7 @@ def build_native_bootstrap(files, root_factory=None):
                 password,
             ),
             auth_cancel=lambda: holder["session"].cancel_authentication(),
+            shell_interaction=lambda: holder["session"].handle_shell_interaction(),
         )
         effects = RuntimeEffects(
             desktop,
@@ -215,7 +278,8 @@ def build_native_bootstrap(files, root_factory=None):
             admin_timeout_seconds=settings.security.admin_session_timeout_seconds,
             tick_interval_ms=settings.security.explorer_guard_interval_ms,
             audit=audit,
-            change_application=admin_actions.change_application,
+            change_application=change_application,
+            restore_action=admin_actions,
         )
         managed = ManagedLauncherSession(session, (audit,))
         holder["session"] = managed
@@ -231,13 +295,18 @@ def build_native_bootstrap(files, root_factory=None):
 
 
 def run_default(argv=None, executable_directory=None, resource_directory=None):
-    executable_directory = executable_directory or os.path.dirname(
-        os.path.abspath(sys.executable)
+    executable_directory = coerce_runtime_directory(
+        executable_directory
+        or os.path.dirname(os.path.abspath(sys.executable)),
+        required_children=("config",),
     )
-    resource_directory = resource_directory or getattr(
+    resource_directory = coerce_runtime_directory(
+        resource_directory or getattr(
         sys,
         "_MEIPASS",
         executable_directory,
+        ),
+        required_children=("contracts",),
     )
     files = resolve_runtime_files(executable_directory, resource_directory)
     from kiosk_v2_legacy.app.config_repository import (
@@ -246,6 +315,7 @@ def run_default(argv=None, executable_directory=None, resource_directory=None):
     )
     from kiosk_v2_legacy.app.runtime_settings import RuntimeSettingsFactory
     from kiosk_v2_legacy.platform.command_line import WindowsArgumentParser
+    from kiosk_v2_legacy.platform.error_dialog import WindowsErrorDialog
     from kiosk_v2_legacy.platform.family_guard import WindowsFamilyGuard
 
     schema = _load_json(files.schema_path)
@@ -257,6 +327,7 @@ def run_default(argv=None, executable_directory=None, resource_directory=None):
         WindowsFamilyGuard(),
         lambda: build_native_bootstrap(files),
         config_check,
+        error_handler=WindowsErrorDialog().show,
     ).run(sys.argv[1:] if argv is None else argv)
 
 

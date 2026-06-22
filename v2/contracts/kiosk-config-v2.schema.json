@@ -32,6 +32,7 @@
         "restartWindowSeconds"
       ],
       "properties": {
+        "configured": {"type": "boolean"},
         "path": {"type": "string", "minLength": 1},
         "arguments": {"type": "string"},
         "workingDirectory": {"type": "string"},

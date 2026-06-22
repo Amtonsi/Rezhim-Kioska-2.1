@@ -32,7 +32,7 @@ class LegacyStateMachineTests(unittest.TestCase):
         self.assertNotIn("stop_keyboard_guard", request.effects)
         success = machine.dispatch("auth_succeeded")
         self.assertEqual("ADMIN_SESSION", success.to_state)
-        self.assertIn("stop_desktop_isolation", success.effects)
+        self.assertNotIn("stop_desktop_isolation", success.effects)
         returned = machine.dispatch("return_to_kiosk")
         self.assertEqual("OPERATOR", returned.to_state)
         self.assertIn("start_keyboard_guard", returned.effects)

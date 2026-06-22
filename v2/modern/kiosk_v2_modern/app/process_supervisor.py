@@ -2,6 +2,9 @@
 import ntpath
 
 
+HANDOFF_GRACE_SECONDS = 5.0
+
+
 def normalize_executable_path(path):
     if not isinstance(path, str) or not path.strip():
         raise ValueError("Application path is required")
@@ -98,6 +101,9 @@ class ProcessSupervisor(object):
         self._failure_times = []
         self._breaker_open = False
         self._tracked_since = None
+        self._runtime_path = None
+        self._handoff_parent_pid = None
+        self._handoff_due_at = None
 
     @property
     def pid(self):
@@ -116,12 +122,21 @@ class ProcessSupervisor(object):
                 failure_count=len(self._failure_times),
             )
 
+        if self._enabled and self._handoff_parent_pid is not None:
+            return self._poll_handoff()
+
         self._enabled = True
         self._pid = None
+        self._runtime_path = None
         self._restart_due_at = None
         self._conflict_pids = ()
+        self._handoff_parent_pid = None
+        self._handoff_due_at = None
         self._reset_breaker()
         discovery = self._discover_existing()
+        if discovery is not None:
+            return discovery
+        discovery = self._discover_existing_by_name()
         if discovery is not None:
             return discovery
         return self._launch("started")
@@ -129,6 +144,9 @@ class ProcessSupervisor(object):
     def tick(self):
         if not self._enabled:
             return SupervisorResult("stopped")
+
+        if self._handoff_parent_pid is not None:
+            return self._poll_handoff()
 
         if self._breaker_open:
             return SupervisorResult(
@@ -145,12 +163,26 @@ class ProcessSupervisor(object):
             )
 
         previous_pid = self._pid
+        previous_tracked_since = self._tracked_since
         self._pid = None
+        self._runtime_path = None
 
-        if self._conflict_pids:
-            discovery = self._discover_existing()
-            if discovery is not None:
-                return discovery
+        discovery = self._discover_existing()
+        if discovery is not None:
+            return discovery
+        discovery = self._discover_existing_by_name()
+        if discovery is not None:
+            return discovery
+
+        short_lived = (
+            previous_pid is not None
+            and previous_tracked_since is not None
+            and self._now() - previous_tracked_since <= HANDOFF_GRACE_SECONDS
+        )
+        if short_lived:
+            handoff = self._discover_handoff(previous_pid)
+            if handoff is not None:
+                return handoff
 
         if previous_pid is not None and not self.settings.restart_on_exit:
             self._enabled = False
@@ -179,15 +211,30 @@ class ProcessSupervisor(object):
                 failure_count=len(self._failure_times),
             )
 
+        discovery = self._discover_existing()
+        if discovery is not None:
+            self._restart_due_at = None
+            return discovery
+        discovery = self._discover_existing_by_name()
+        if discovery is not None:
+            self._restart_due_at = None
+            return discovery
+
         return self._launch("restarted", previous_pid=previous_pid)
 
     def stop_supervision(self):
         previous_pid = self._pid
+        handoff_parent_pid = self._handoff_parent_pid
+        self._clear_handoff(previous_pid)
+        self._clear_handoff(handoff_parent_pid)
         self._enabled = False
         self._pid = None
+        self._runtime_path = None
         self._restart_due_at = None
         self._conflict_pids = ()
         self._tracked_since = None
+        self._handoff_parent_pid = None
+        self._handoff_due_at = None
         self._reset_breaker()
         return SupervisorResult(
             "stopped",
@@ -220,6 +267,7 @@ class ProcessSupervisor(object):
             )
         if candidates:
             self._pid = candidates[0].pid
+            self._runtime_path = candidates[0].path
             self._conflict_pids = ()
             self._tracked_since = self._now()
             return SupervisorResult(
@@ -230,10 +278,114 @@ class ProcessSupervisor(object):
         self._conflict_pids = ()
         return None
 
+    def _discover_existing_by_name(self):
+        finder = getattr(self.process_api, "find_existing_by_name", None)
+        if finder is None:
+            return None
+        try:
+            discovered = tuple(finder(self.settings.path))
+        except (OSError, RuntimeError):
+            return None
+        candidates = []
+        for process in discovered:
+            if process.running and self.process_api.is_running(
+                process.pid,
+                process.path,
+            ):
+                candidates.append(process)
+        candidates.sort(key=lambda item: item.pid)
+        if len(candidates) > 1 and self.settings.single_instance:
+            self._conflict_pids = tuple(item.pid for item in candidates)
+            return SupervisorResult(
+                "conflict",
+                conflict_pids=self._conflict_pids,
+                failure_count=len(self._failure_times),
+            )
+        if not candidates:
+            return None
+        self._pid = candidates[0].pid
+        self._runtime_path = candidates[0].path
+        self._conflict_pids = ()
+        self._tracked_since = self._now()
+        return SupervisorResult(
+            "adopted",
+            pid=self._pid,
+            failure_count=len(self._failure_times),
+        )
+
     def _tracked_process_is_running(self):
         return self._pid is not None and self.process_api.is_running(
             self._pid,
-            self.settings.path,
+            self._runtime_path or self.settings.path,
+        )
+
+    def _discover_handoff(self, parent_pid):
+        finder = getattr(self.process_api, "find_handoff", None)
+        if finder is None:
+            return None
+        try:
+            discovered = tuple(finder(parent_pid, self.settings.path))
+        except (OSError, RuntimeError):
+            return None
+        candidates = []
+        for process in discovered:
+            if process.running and self.process_api.is_running(
+                process.pid,
+                process.path,
+            ):
+                candidates.append(process)
+        candidates.sort(key=lambda item: item.pid)
+        if len(candidates) > 1 and self.settings.single_instance:
+            self._conflict_pids = tuple(item.pid for item in candidates)
+            self._clear_handoff(parent_pid)
+            self._handoff_parent_pid = None
+            self._handoff_due_at = None
+            return SupervisorResult(
+                "conflict",
+                conflict_pids=self._conflict_pids,
+                failure_count=len(self._failure_times),
+            )
+        if not candidates:
+            return None
+        self._pid = candidates[0].pid
+        self._runtime_path = candidates[0].path
+        self._conflict_pids = ()
+        self._tracked_since = self._now()
+        self._clear_handoff(parent_pid)
+        self._handoff_parent_pid = None
+        self._handoff_due_at = None
+        return SupervisorResult(
+            "adopted",
+            pid=self._pid,
+            failure_count=len(self._failure_times),
+        )
+
+    def _poll_handoff(self):
+        parent_pid = self._handoff_parent_pid
+        discovered = self._discover_handoff(parent_pid)
+        if discovered is not None:
+            return discovered
+        if self._now() < self._handoff_due_at:
+            return SupervisorResult(
+                "waiting_handoff",
+                previous_pid=parent_pid,
+                failure_count=len(self._failure_times),
+            )
+        self._clear_handoff(parent_pid)
+        self._handoff_parent_pid = None
+        self._handoff_due_at = None
+        self._record_failure()
+        if self._breaker_open:
+            return SupervisorResult(
+                "crash_loop",
+                previous_pid=parent_pid,
+                failure_count=len(self._failure_times),
+            )
+        self._restart_due_at = self._now() + self._restart_delay_seconds()
+        return SupervisorResult(
+            "waiting_restart",
+            previous_pid=parent_pid,
+            failure_count=len(self._failure_times),
         )
 
     def _launch(self, success_status, previous_pid=None):
@@ -244,7 +396,29 @@ class ProcessSupervisor(object):
             ):
                 raise ValueError("Started process path does not match configuration")
             if not self.process_api.is_running(process.pid, self.settings.path):
-                raise RuntimeError("Started process is not running")
+                discovery = self._discover_existing()
+                if discovery is not None:
+                    self._restart_due_at = None
+                    return discovery
+                discovery = self._discover_existing_by_name()
+                if discovery is not None:
+                    self._restart_due_at = None
+                    return discovery
+                handoff = self._discover_handoff(process.pid)
+                if handoff is not None:
+                    self._restart_due_at = None
+                    return handoff
+                self._pid = None
+                self._runtime_path = None
+                self._tracked_since = None
+                self._restart_due_at = None
+                self._handoff_parent_pid = process.pid
+                self._handoff_due_at = self._now() + HANDOFF_GRACE_SECONDS
+                return SupervisorResult(
+                    "waiting_handoff",
+                    previous_pid=process.pid,
+                    failure_count=len(self._failure_times),
+                )
         except Exception as error:
             self._pid = None
             self._tracked_since = None
@@ -266,6 +440,7 @@ class ProcessSupervisor(object):
             )
 
         self._pid = process.pid
+        self._runtime_path = process.path
         self._restart_due_at = None
         self._conflict_pids = ()
         self._tracked_since = self._now()
@@ -289,9 +464,22 @@ class ProcessSupervisor(object):
     def _clear_failures_after_stable_run(self):
         if self._tracked_since is None:
             return
+        if self._now() - self._tracked_since >= HANDOFF_GRACE_SECONDS:
+            self._clear_handoff(self._pid)
         if self._now() - self._tracked_since >= self.settings.restart_window_seconds:
             self._failure_times = []
             self._breaker_open = False
+
+    def _clear_handoff(self, parent_pid):
+        if parent_pid is None:
+            return
+        cleaner = getattr(self.process_api, "clear_handoff", None)
+        if cleaner is None:
+            return
+        try:
+            cleaner(parent_pid)
+        except (OSError, RuntimeError):
+            return
 
     def _reset_breaker(self):
         self._failure_times = []

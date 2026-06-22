@@ -53,6 +53,27 @@ class FakeCanvas(object):
         self.bindings.append((tag, event, callback))
 
 
+class DeferredRoot(object):
+    def __init__(self):
+        self.callbacks = []
+
+    def after(self, milliseconds, callback):
+        self.callbacks.append((milliseconds, callback))
+
+
+class TaggedCanvas(object):
+    def __init__(self, tags):
+        self.tags = tuple(tags)
+
+    def gettags(self, item):
+        return self.tags
+
+    def find_withtag(self, tag):
+        if tag == "current" and self.tags:
+            return (1,)
+        return ()
+
+
 class RendererTests(unittest.TestCase):
     def test_buttons_are_bound_once_and_emit_only_their_action(self):
         for renderer_class, build_scene in RENDERERS:
@@ -94,6 +115,38 @@ class RendererTests(unittest.TestCase):
             self.assertEqual("*", password["show"])
             self.assertEqual("#f4f6f8", username["fg"])
             self.assertEqual("#f4f6f8", username["insertbackground"])
+
+    def test_button_clicks_do_not_schedule_shell_foreground_interaction(self):
+        for renderer_class, _build_scene in RENDERERS:
+            module = __import__(renderer_class.__module__, fromlist=["KioskCanvasView"])
+            root = DeferredRoot()
+            calls = []
+            view = module.KioskCanvasView.__new__(module.KioskCanvasView)
+            view.root = root
+            view.canvas = TaggedCanvas(("action:unlock",))
+            view.shell_interaction = lambda: calls.append("shell")
+
+            view._on_shell_click(None)
+
+            self.assertEqual([], root.callbacks)
+            self.assertEqual([], calls)
+
+    def test_background_clicks_schedule_shell_foreground_interaction(self):
+        for renderer_class, _build_scene in RENDERERS:
+            module = __import__(renderer_class.__module__, fromlist=["KioskCanvasView"])
+            root = DeferredRoot()
+            calls = []
+            view = module.KioskCanvasView.__new__(module.KioskCanvasView)
+            view.root = root
+            view.canvas = TaggedCanvas(("background",))
+            view.shell_interaction = lambda: calls.append("shell")
+
+            view._on_shell_click(None)
+
+            self.assertEqual(1, len(root.callbacks))
+            self.assertEqual(0, root.callbacks[0][0])
+            root.callbacks[0][1]()
+            self.assertEqual(["shell"], calls)
 
 
 if __name__ == "__main__":

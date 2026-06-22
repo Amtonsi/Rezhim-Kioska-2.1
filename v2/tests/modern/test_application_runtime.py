@@ -69,6 +69,7 @@ class FakeWindowApi(object):
         self.minimized = set()
         self.restore_calls = []
         self.foreground_calls = []
+        self.foreground_succeeds = True
 
     def windows_for_pid(self, pid):
         return list(self.windows.get(pid, []))
@@ -83,7 +84,7 @@ class FakeWindowApi(object):
 
     def bring_to_front(self, hwnd):
         self.foreground_calls.append(hwnd)
-        return True
+        return self.foreground_succeeds
 
 
 def create_runtime(clock=None, process_api=None, window_api=None):
@@ -140,6 +141,53 @@ class ApplicationRuntimeTests(unittest.TestCase):
         self.assertEqual([1000], window_api.foreground_calls)
         self.assertEqual(1, len(process_api.start_calls))
 
+    def test_failed_initial_foreground_attempt_does_not_restore_on_later_tick(self):
+        runtime, process_api, window_api, _clock = create_runtime()
+        window_api.foreground_succeeds = False
+
+        started = runtime.start()
+        window_api.minimized.add(1000)
+        minimized = runtime.tick()
+
+        self.assertEqual("foreground_failed", started.window_status)
+        self.assertEqual("minimized", minimized.window_status)
+        self.assertEqual([], window_api.restore_calls)
+        self.assertEqual([1000], window_api.foreground_calls)
+        self.assertEqual(1, len(process_api.start_calls))
+
+    def test_shell_interaction_brings_visible_application_to_front(self):
+        runtime, _process_api, window_api, _clock = create_runtime()
+        runtime.start()
+        window_api.foreground_calls = []
+
+        result = runtime.bring_to_front()
+
+        self.assertEqual("visible", result.window_status)
+        self.assertEqual([1000], window_api.foreground_calls)
+        self.assertEqual([], window_api.restore_calls)
+
+    def test_shell_interaction_does_not_restore_minimized_application(self):
+        runtime, _process_api, window_api, _clock = create_runtime()
+        runtime.start()
+        window_api.foreground_calls = []
+        window_api.minimized.add(1000)
+
+        result = runtime.bring_to_front()
+
+        self.assertEqual("minimized", result.window_status)
+        self.assertEqual([], window_api.foreground_calls)
+        self.assertEqual([], window_api.restore_calls)
+
+    def test_shell_interaction_is_suppressed_during_admin_dialog(self):
+        runtime, _process_api, window_api, _clock = create_runtime()
+        runtime.start()
+        window_api.foreground_calls = []
+
+        result = runtime.bring_to_front(admin_dialog_open=True)
+
+        self.assertEqual("suppressed", result.window_status)
+        self.assertEqual([], window_api.foreground_calls)
+
     def test_exit_restarts_once_after_delay_and_activates_new_window(self):
         runtime, process_api, window_api, clock = create_runtime()
         first = runtime.start()
@@ -165,14 +213,42 @@ class ApplicationRuntimeTests(unittest.TestCase):
         suppressed = runtime.tick(admin_dialog_open=True)
         still_suppressed = runtime.tick(admin_dialog_open=True)
 
-        self.assertEqual("suppressed", suppressed.window_status)
-        self.assertEqual("suppressed", still_suppressed.window_status)
+        self.assertEqual("visible", suppressed.window_status)
+        self.assertEqual("visible", still_suppressed.window_status)
         self.assertEqual([1000], window_api.foreground_calls)
 
         activated = runtime.tick(admin_dialog_open=False)
 
         self.assertEqual("visible", activated.window_status)
-        self.assertEqual([1000, 1001], window_api.foreground_calls)
+        self.assertEqual([1000], window_api.foreground_calls)
+
+    def test_pending_window_during_admin_dialog_updates_status_without_focus_steal(self):
+        runtime, _process_api, window_api, _clock = create_runtime()
+        window_api.windows[100] = []
+
+        started = runtime.start()
+        window_api.windows[100] = [1000]
+        visible = runtime.tick(admin_dialog_open=True)
+
+        self.assertEqual("no_window", started.window_status)
+        self.assertEqual("visible", visible.window_status)
+        self.assertEqual([], window_api.restore_calls)
+        self.assertEqual([], window_api.foreground_calls)
+
+    def test_pending_window_during_admin_session_reports_minimized_without_focus_steal(self):
+        runtime, _process_api, window_api, _clock = create_runtime()
+        window_api.windows[100] = []
+
+        runtime.start()
+        window_api.windows[100] = [1000]
+        window_api.minimized.add(1000)
+        minimized = runtime.tick(admin_session_active=True)
+        later = runtime.tick(admin_session_active=True)
+
+        self.assertEqual("minimized", minimized.window_status)
+        self.assertEqual("minimized", later.window_status)
+        self.assertEqual([], window_api.restore_calls)
+        self.assertEqual([], window_api.foreground_calls)
 
     def test_stop_leaves_process_alive_and_resume_adopts_without_activation_or_launch(self):
         runtime, process_api, window_api, _clock = create_runtime()

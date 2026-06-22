@@ -63,6 +63,9 @@ class FakeProcessApi(object):
             if normalize(item.path) == expected
         ]
 
+    def find_handoff(self, parent_pid, path):
+        return []
+
     def start(self, application_settings):
         self.start_calls.append(application_settings)
         if self.start_errors:
@@ -82,6 +85,97 @@ class FakeProcessApi(object):
     def terminate(self, pid):
         self.terminate_calls.append(pid)
         self.running[pid] = False
+
+
+class HandOffProcessApi(FakeProcessApi):
+    def __init__(self, handoff_pid=200):
+        super(HandOffProcessApi, self).__init__(existing=[])
+        self.handoff_pid = handoff_pid
+
+    def start(self, application_settings):
+        self.start_calls.append(application_settings)
+        launcher_pid = self.next_pid
+        self.next_pid += 1
+        launcher = ProcessRef(launcher_pid, application_settings.path, False)
+        self.existing.append(launcher)
+        self.running[launcher.pid] = False
+        self.paths[launcher.pid] = launcher.path
+
+        handoff = ProcessRef(self.handoff_pid, application_settings.path, True)
+        self.existing.append(handoff)
+        self.running[handoff.pid] = True
+        self.paths[handoff.pid] = handoff.path
+        return launcher
+
+
+class DelayedDifferentPathHandoffApi(FakeProcessApi):
+    HANDOFF_PATH = (
+        r"C:\Program Files\WindowsApps\Microsoft.WindowsNotepad_1.0_x64"
+        r"\Notepad\Notepad.exe"
+    )
+
+    def __init__(self, handoff_pid=250):
+        super(DelayedDifferentPathHandoffApi, self).__init__(existing=[])
+        self.handoff_pid = handoff_pid
+        self.handoff_ready = False
+        self.launcher_pid = None
+        self.cleared_handoffs = []
+
+    def start(self, application_settings):
+        self.start_calls.append(application_settings)
+        self.launcher_pid = self.next_pid
+        self.next_pid += 1
+        self.running[self.launcher_pid] = False
+        self.paths[self.launcher_pid] = application_settings.path
+        return ProcessRef(self.launcher_pid, application_settings.path, False)
+
+    def find_handoff(self, parent_pid, path):
+        if not self.handoff_ready or parent_pid != self.launcher_pid:
+            return []
+        self.running[self.handoff_pid] = True
+        self.paths[self.handoff_pid] = self.HANDOFF_PATH
+        return [ProcessRef(self.handoff_pid, self.HANDOFF_PATH, True)]
+
+    def clear_handoff(self, parent_pid):
+        self.cleared_handoffs.append(parent_pid)
+
+
+class ExistingNameHandoffApi(FakeProcessApi):
+    HANDOFF_PATH = (
+        r"C:\Program Files\WindowsApps\Microsoft.WindowsNotepad_1.0_x64"
+        r"\Notepad\Notepad.exe"
+    )
+
+    def __init__(self, handoff_pid=250):
+        super(ExistingNameHandoffApi, self).__init__(existing=[])
+        self.handoff_pid = handoff_pid
+        self.find_by_name_calls = 0
+        self.running[handoff_pid] = True
+        self.paths[handoff_pid] = self.HANDOFF_PATH
+
+    def find_existing_by_name(self, path):
+        self.find_by_name_calls += 1
+        return [ProcessRef(self.handoff_pid, self.HANDOFF_PATH, True)]
+
+
+class RunningThenHandoffApi(DelayedDifferentPathHandoffApi):
+    def start(self, application_settings):
+        process = super(RunningThenHandoffApi, self).start(application_settings)
+        process.running = True
+        self.running[process.pid] = True
+        return process
+
+
+class TemporarilyFailingHandoffApi(DelayedDifferentPathHandoffApi):
+    def __init__(self):
+        super(TemporarilyFailingHandoffApi, self).__init__()
+        self.handoff_checks = 0
+
+    def find_handoff(self, parent_pid, path):
+        self.handoff_checks += 1
+        if self.handoff_checks == 1:
+            return []
+        raise OSError("snapshot temporarily unavailable")
 
 
 class ProcessSupervisorTests(unittest.TestCase):
@@ -126,6 +220,91 @@ class ProcessSupervisorTests(unittest.TestCase):
         self.assertEqual("restarted", restarted.status)
         self.assertNotEqual(first.pid, restarted.pid)
         self.assertEqual(2, len(api.start_calls))
+
+    def test_adopts_handoff_process_when_launcher_pid_exits_immediately(self):
+        api = HandOffProcessApi(handoff_pid=250)
+        supervisor = ProcessSupervisor(settings(), api, FakeClock())
+
+        result = supervisor.start()
+
+        self.assertEqual("adopted", result.status)
+        self.assertEqual(250, result.pid)
+        self.assertEqual(1, len(api.start_calls))
+        self.assertEqual(0, result.failure_count)
+
+    def test_restart_adopts_existing_handoff_before_opening_duplicate(self):
+        clock = FakeClock(10.0)
+        api = FakeProcessApi(existing=[])
+        supervisor = ProcessSupervisor(settings(restart_delay_ms=1000), api, clock)
+        first = supervisor.start()
+        api.running[first.pid] = False
+        handoff = ProcessRef(250, APP_PATH, True)
+        api.existing.append(handoff)
+        api.running[250] = True
+        api.paths[250] = APP_PATH
+
+        adopted = supervisor.tick()
+
+        self.assertEqual("adopted", adopted.status)
+        self.assertEqual(250, adopted.pid)
+        self.assertEqual(1, len(api.start_calls))
+
+    def test_waits_for_delayed_different_path_handoff_without_duplicate_launch(self):
+        clock = FakeClock(10.0)
+        api = DelayedDifferentPathHandoffApi(handoff_pid=250)
+        supervisor = ProcessSupervisor(settings(), api, clock)
+
+        waiting = supervisor.start()
+        api.handoff_ready = True
+        adopted = supervisor.tick()
+        running = supervisor.tick()
+
+        self.assertEqual("waiting_handoff", waiting.status)
+        self.assertEqual("adopted", adopted.status)
+        self.assertEqual(250, adopted.pid)
+        self.assertEqual("running", running.status)
+        self.assertEqual(1, len(api.start_calls))
+        self.assertEqual([api.launcher_pid], api.cleared_handoffs)
+
+    def test_adopts_existing_same_name_broker_process_without_duplicate_launch(self):
+        api = ExistingNameHandoffApi(handoff_pid=250)
+        supervisor = ProcessSupervisor(
+            settings(path=r"C:\Windows\System32\notepad.exe"),
+            api,
+            FakeClock(),
+        )
+
+        result = supervisor.start()
+        again = supervisor.start()
+
+        self.assertEqual("adopted", result.status)
+        self.assertEqual(250, result.pid)
+        self.assertEqual("running", again.status)
+        self.assertEqual([], api.start_calls)
+        self.assertEqual(1, api.find_by_name_calls)
+
+    def test_short_lived_launcher_is_replaced_by_its_handoff_child(self):
+        api = RunningThenHandoffApi(handoff_pid=260)
+        supervisor = ProcessSupervisor(settings(), api, FakeClock())
+        started = supervisor.start()
+        api.running[started.pid] = False
+        api.handoff_ready = True
+
+        adopted = supervisor.tick()
+
+        self.assertEqual("adopted", adopted.status)
+        self.assertEqual(260, adopted.pid)
+        self.assertEqual(1, len(api.start_calls))
+
+    def test_temporary_handoff_discovery_error_does_not_crash_tick(self):
+        api = TemporarilyFailingHandoffApi()
+        supervisor = ProcessSupervisor(settings(), api, FakeClock())
+
+        self.assertEqual("waiting_handoff", supervisor.start().status)
+        result = supervisor.tick()
+
+        self.assertEqual("waiting_handoff", result.status)
+        self.assertEqual(1, len(api.start_calls))
 
     def test_alive_process_is_not_reopened(self):
         api = FakeProcessApi(existing=[ProcessRef(10, APP_PATH, True)])

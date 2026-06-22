@@ -126,7 +126,7 @@ Expected: все тесты завершаются со статусом `OK`.
 
 - [ ] **Step 2: Выполнить Legacy-тесты**
 
-Run: `v2/toolchain/python27-x86/python.exe -m unittest discover -s v2/tests/legacy -p 'test_*.py'`
+Run: `& "$env:LOCALAPPDATA\Python27-x86-portable\python.exe" -m unittest discover -s v2/tests/legacy -p 'test_*.py'`
 
 Expected: все тесты завершаются со статусом `OK`.
 

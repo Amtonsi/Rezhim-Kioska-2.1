@@ -25,12 +25,19 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    exclude_binaries=True,
     name='Restore-V2-Legacy',
     debug=False,
     strip=False,
     upx=True,
     console=True,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    name='Restore-V2-Legacy',
 )

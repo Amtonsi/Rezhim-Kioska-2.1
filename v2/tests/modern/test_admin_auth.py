@@ -19,6 +19,7 @@ class FakeAuthApi(object):
     def __init__(self, valid=True, administrator=True, error_code=1326):
         self.valid = valid
         self.administrator = administrator
+        self.local_group_administrator = administrator
         self.error_code = error_code
         self.token = 77
         self.closed = []
@@ -32,6 +33,9 @@ class FakeAuthApi(object):
 
     def is_local_administrator(self, token):
         return self.administrator
+
+    def user_in_local_administrators(self, username):
+        return self.local_group_administrator
 
     def close_token(self, token):
         self.closed.append(token)
@@ -77,11 +81,22 @@ class WindowsAdminAuthTests(unittest.TestCase):
 
     def test_rejects_valid_non_admin_and_closes_token(self):
         api = FakeAuthApi(valid=True, administrator=False)
+        api.local_group_administrator = False
 
         result = WindowsAdminAuth(api).authenticate("User", "secret")
 
         self.assertFalse(result.success)
         self.assertEqual("not_administrator", result.code)
+        self.assertEqual([api.token], api.closed)
+
+    def test_accepts_local_admin_group_even_when_uac_filtered_token_is_not_member(self):
+        api = FakeAuthApi(valid=True, administrator=False)
+        api.local_group_administrator = True
+
+        result = WindowsAdminAuth(api).authenticate("impal", "secret")
+
+        self.assertTrue(result.success)
+        self.assertEqual("success", result.code)
         self.assertEqual([api.token], api.closed)
 
     def test_maps_bad_credentials_without_token_or_password_log(self):

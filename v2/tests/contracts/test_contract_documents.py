@@ -27,9 +27,22 @@ class ContractDocumentTests(unittest.TestCase):
         self.assertEqual(set(schema["required"]), set(default))
         for section in ("allowedApplication", "kiosk", "logging", "testing"):
             section_schema = schema["properties"][section]
-            self.assertEqual(set(section_schema["required"]), set(default[section]))
+            required = set(section_schema["required"])
+            properties = set(section_schema["properties"])
+            actual = set(default[section])
+            self.assertTrue(required.issubset(actual))
+            self.assertTrue(actual.issubset(properties))
         self.assertEqual(2, default["schemaVersion"])
         self.assertEqual(r"C:\Windows\System32\notepad.exe", default["allowedApplication"]["path"])
+        self.assertFalse(default["allowedApplication"]["configured"])
+        self.assertEqual(
+            "boolean",
+            schema["properties"]["allowedApplication"]["properties"]["configured"]["type"],
+        )
+        self.assertNotIn(
+            "configured",
+            schema["properties"]["allowedApplication"]["required"],
+        )
         self.assertFalse(default["allowedApplication"]["restoreIfMinimized"])
         self.assertTrue(default["kiosk"]["allowWinL"])
         self.assertTrue(default["testing"]["requireBackupBeforeTest"])

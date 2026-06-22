@@ -10,8 +10,39 @@ if (-not $Toolchain) {
 }
 $Toolchain = [IO.Path]::GetFullPath($Toolchain)
 $distPath = Join-Path $projectRoot "v2\dist\legacy"
+$stagingDistPath = Join-Path $projectRoot "v2\build\dist-legacy-onedir"
 $workLauncher = Join-Path $projectRoot "v2\build\work-legacy-launcher"
 $workRestore = Join-Path $projectRoot "v2\build\work-legacy-restore"
+$workConfigurator = Join-Path $projectRoot "v2\build\work-legacy-configurator"
+
+function Reset-ProjectDirectory {
+    param([string]$Path)
+
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $safeRoot = [IO.Path]::GetFullPath($projectRoot)
+    if (-not $fullPath.StartsWith($safeRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clear path outside project root: $fullPath"
+    }
+    if (Test-Path -LiteralPath $fullPath) {
+        Remove-Item -LiteralPath $fullPath -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
+}
+
+function Merge-LegacyOnedirOutput {
+    param([string]$Name)
+
+    $sourceDirectory = Join-Path $stagingDistPath $Name
+    $sourceExecutable = Join-Path $sourceDirectory "$Name.exe"
+    if (-not (Test-Path -LiteralPath $sourceExecutable -PathType Leaf)) {
+        throw "Legacy onedir executable was not produced: $sourceExecutable"
+    }
+
+    Get-ChildItem -LiteralPath $sourceDirectory -Force | ForEach-Object {
+        $destination = Join-Path $distPath $_.Name
+        Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse -Force
+    }
+}
 
 if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
     throw "Python 2.7 x86 was not found: $Python"
@@ -37,15 +68,27 @@ try {
         throw "Legacy build requires Python 2.7 x86 and the local pywin32 runtime."
     }
 
+    Reset-ProjectDirectory -Path $distPath
+    Reset-ProjectDirectory -Path $stagingDistPath
+
     & $Python -m PyInstaller --noconfirm --clean `
-        --distpath $distPath --workpath $workLauncher `
+        --distpath $stagingDistPath --workpath $workLauncher `
         "v2\build\legacy-launcher.spec"
     if ($LASTEXITCODE -ne 0) { throw "Legacy launcher build failed." }
 
     & $Python -m PyInstaller --noconfirm --clean `
-        --distpath $distPath --workpath $workRestore `
+        --distpath $stagingDistPath --workpath $workRestore `
         "v2\build\legacy-restore.spec"
     if ($LASTEXITCODE -ne 0) { throw "Legacy Restore build failed." }
+
+    & $Python -m PyInstaller --noconfirm --clean `
+        --distpath $stagingDistPath --workpath $workConfigurator `
+        "v2\build\legacy-configurator.spec"
+    if ($LASTEXITCODE -ne 0) { throw "Legacy Configurator build failed." }
+
+    Merge-LegacyOnedirOutput -Name "RezhimKioska-V2-Legacy"
+    Merge-LegacyOnedirOutput -Name "Restore-V2-Legacy"
+    Merge-LegacyOnedirOutput -Name "Configurator-V2-Legacy"
 
     $configDirectory = Join-Path $distPath "config"
     New-Item -ItemType Directory -Force -Path $configDirectory | Out-Null
@@ -53,6 +96,19 @@ try {
         -Destination (Join-Path $configDirectory "kiosk.v2.json") -Force
     Copy-Item -LiteralPath (Join-Path $distPath "Restore-V2-Legacy.exe") `
         -Destination (Join-Path $distPath "Restore.exe") -Force
+    Copy-Item -LiteralPath (Join-Path $distPath "Configurator-V2-Legacy.exe") `
+        -Destination (Join-Path $distPath "Configurator.exe") -Force
+    $readmePath = Join-Path $distPath "LEGACY-XP-README.txt"
+    $readmeLines = @(
+        "Legacy package for Windows XP SP1 / Server 2003 / Windows 7 x86.",
+        "",
+        "Keep all files in this folder together. Do not copy only the EXE.",
+        "Run RezhimKioska-V2-Legacy.exe from this folder.",
+        "Modern build is separate and is not required for this legacy package."
+    )
+    $asciiEncoding = New-Object System.Text.ASCIIEncoding
+    [IO.File]::WriteAllLines($readmePath, $readmeLines, $asciiEncoding)
+    & (Join-Path $PSScriptRoot "write-sha256.ps1") -ProjectRoot $projectRoot
 }
 finally {
     Pop-Location

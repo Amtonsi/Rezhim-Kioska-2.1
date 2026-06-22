@@ -57,6 +57,7 @@ class RuntimeSettingsTests(unittest.TestCase):
         self.assertEqual(2500, runtime.application.restart_delay_ms)
         self.assertEqual(4, runtime.application.max_restart_attempts)
         self.assertEqual(45, runtime.application.restart_window_seconds)
+        self.assertFalse(runtime.application_configured)
         self.assertEqual("test", runtime.operator_user)
         self.assertTrue(runtime.window.bring_to_front)
         self.assertFalse(runtime.window.start_maximized)
@@ -78,6 +79,14 @@ class RuntimeSettingsTests(unittest.TestCase):
         RuntimeSettingsFactory(FakeArgumentParser()).build(config)
 
         self.assertEqual(before, config)
+
+    def test_missing_configured_field_keeps_legacy_configuration_enabled(self):
+        config = default_config()
+        del config["allowedApplication"]["configured"]
+
+        runtime = RuntimeSettingsFactory(FakeArgumentParser()).build(config)
+
+        self.assertTrue(runtime.application_configured)
 
     def test_password_like_field_is_rejected_without_value_in_error(self):
         config = default_config()

@@ -55,6 +55,9 @@ class FakeView(object):
     def show_restore_result(self):
         self.calls.append("restore_result")
 
+    def show_restore_error(self):
+        self.calls.append("restore_error")
+
 
 class FakeRestore(object):
     def __init__(self):
@@ -96,14 +99,14 @@ class SecurityRuntimeTests(unittest.TestCase):
 
         self.controller.handle("unlock_requested")
         self.controller.handle("auth_succeeded")
-        self.assertFalse(self.desktop.running)
+        self.assertTrue(self.desktop.running)
         self.assertFalse(self.keyboard.running)
 
         self.controller.handle("return_to_kiosk")
         self.assertTrue(self.desktop.running)
         self.assertTrue(self.keyboard.running)
 
-    def test_restore_stops_guards_before_running_restore(self):
+    def test_restore_transition_stops_guards_before_session_runs_restore(self):
         self.controller.handle("boot_completed")
         self.controller.handle("unlock_requested")
         self.controller.handle("auth_succeeded")
@@ -112,7 +115,7 @@ class SecurityRuntimeTests(unittest.TestCase):
 
         self.assertFalse(self.desktop.running)
         self.assertFalse(self.keyboard.running)
-        self.assertEqual(["restore"], self.restore.calls)
+        self.assertEqual([], self.restore.calls)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ dist/
 build-*/
 dist-*/
 release/
+v2/toolchain/
 .venv/
 .idea/
 .worktrees/

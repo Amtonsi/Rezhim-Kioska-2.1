@@ -75,6 +75,25 @@ class ApplicationRuntime(object):
             window_status=window.status,
         )
 
+    def bring_to_front(
+        self,
+        admin_dialog_open=False,
+        admin_session_active=False,
+    ):
+        pid = self.supervisor.pid
+        if pid is None:
+            return ApplicationRuntimeResult("stopped")
+        window = self.window_coordinator.bring_to_front(
+            pid,
+            admin_dialog_open=admin_dialog_open,
+            admin_session_active=admin_session_active,
+        )
+        return ApplicationRuntimeResult(
+            "running",
+            pid=pid,
+            window_status=window.status,
+        )
+
     def stop_supervision(self):
         process = self.supervisor.stop_supervision()
         self._pending_activation_pid = None
@@ -103,13 +122,16 @@ class ApplicationRuntime(object):
             return self._result(process, "no_window")
 
         if self._pending_activation_pid == process.pid:
-            window = self.window_coordinator.activate_initial(
-                process.pid,
-                maximized=self.start_maximized,
-                admin_dialog_open=admin_dialog_open,
-                admin_session_active=admin_session_active,
-            )
-            if window.succeeded:
+            if admin_dialog_open or admin_session_active:
+                window = self.window_coordinator.inspect(process.pid)
+            else:
+                window = self.window_coordinator.activate_initial(
+                    process.pid,
+                    maximized=self.start_maximized,
+                    admin_dialog_open=False,
+                    admin_session_active=False,
+                )
+            if window.hwnd is not None:
                 self._pending_activation_pid = None
         else:
             window = self.window_coordinator.inspect(process.pid)

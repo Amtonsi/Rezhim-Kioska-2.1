@@ -151,7 +151,6 @@ class AppControllerTests(unittest.TestCase):
         self.assertEqual(
             [
                 "stop_keyboard_guard",
-                "stop_desktop_isolation",
                 "show_admin_session",
             ],
             effects.calls,

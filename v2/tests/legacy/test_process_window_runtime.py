@@ -47,6 +47,53 @@ class FakeProcessNative(object):
         return self.running.get(pid, False)
 
 
+class FakeHandoffNative(object):
+    HANDOFF_PATH = r"C:\Program Files\WindowsApps\Vendor_1.0\Allowed.exe"
+
+    def process_parent_map(self):
+        return {200: 100, 201: 100, 202: 999}
+
+    def query_image_path(self, pid):
+        return {
+            200: self.HANDOFF_PATH,
+            201: r"C:\Program Files\WindowsApps\Vendor_1.0\Helper.exe",
+            202: self.HANDOFF_PATH,
+        }[pid]
+
+    def is_process_running(self, pid, expected_path):
+        return pid == 200 and expected_path == self.HANDOFF_PATH
+
+
+class FakeBrokerNative(object):
+    EXISTING_PATH = r"C:\Program Files\WindowsApps\Vendor_1.0\Allowed.exe"
+    NEW_PATH = r"C:\Program Files\WindowsApps\Vendor_2.0\Allowed.exe"
+
+    def __init__(self):
+        self.after_launch = False
+
+    def process_ids(self):
+        if self.after_launch:
+            return [300, 301]
+        return [300]
+
+    def process_parent_map(self):
+        return {300: 999, 301: 999}
+
+    def query_image_path(self, pid):
+        return {
+            300: self.EXISTING_PATH,
+            301: self.NEW_PATH,
+        }[pid]
+
+    def is_process_running(self, pid, expected_path):
+        return expected_path == self.query_image_path(pid)
+
+
+class SnapshotFailingNative(FakeBrokerNative):
+    def process_ids(self):
+        raise OSError("snapshot unavailable")
+
+
 class FakePopen(object):
     next_pid = 100
 
@@ -148,6 +195,9 @@ class FakeWindowNative(object):
 
 
 class LegacyProcessWindowRuntimeTests(unittest.TestCase):
+    def setUp(self):
+        FakePopen.next_pid = 100
+
     def test_process_runtime_filters_exact_full_path_and_liveness(self):
         native = FakeProcessNative()
         runtime = LegacyProcessRuntime(native=native, popen_factory=PopenFactory())
@@ -173,6 +223,55 @@ class LegacyProcessWindowRuntimeTests(unittest.TestCase):
         self.assertEqual(1, len(factory.calls))
         self.assertEqual([APP_PATH, "--profile", "Operator One"], factory.calls[0].command)
         self.assertFalse(factory.calls[0].shell)
+
+    def test_finds_running_same_name_child_handoff_with_actual_runtime_path(self):
+        runtime = LegacyProcessRuntime(
+            native=FakeHandoffNative(),
+            popen_factory=PopenFactory(),
+        )
+
+        found = runtime.find_handoff(100, APP_PATH)
+
+        self.assertEqual([200], [item.pid for item in found])
+        self.assertEqual(FakeHandoffNative.HANDOFF_PATH, found[0].path)
+
+    def test_finds_new_same_name_broker_process_outside_launcher_tree(self):
+        native = FakeBrokerNative()
+        runtime = LegacyProcessRuntime(
+            native=native,
+            popen_factory=PopenFactory(),
+        )
+
+        runtime.start(ApplicationSettings(APP_PATH))
+        native.after_launch = True
+        found = runtime.find_handoff(100, APP_PATH)
+
+        self.assertEqual([301], [item.pid for item in found])
+        self.assertEqual(FakeBrokerNative.NEW_PATH, found[0].path)
+
+    def test_does_not_adopt_same_name_process_present_before_launch(self):
+        native = FakeBrokerNative()
+        runtime = LegacyProcessRuntime(
+            native=native,
+            popen_factory=PopenFactory(),
+        )
+
+        runtime.start(ApplicationSettings(APP_PATH))
+        found = runtime.find_handoff(100, APP_PATH)
+
+        self.assertEqual([], found)
+
+    def test_snapshot_failure_does_not_prevent_allowed_application_start(self):
+        factory = PopenFactory()
+        runtime = LegacyProcessRuntime(
+            native=SnapshotFailingNative(),
+            popen_factory=factory,
+        )
+
+        process = runtime.start(ApplicationSettings(APP_PATH))
+
+        self.assertEqual(100, process.pid)
+        self.assertEqual(1, len(factory.calls))
 
     def test_native_process_query_and_liveness_always_close_handle(self):
         native = TrackingProcessNative()

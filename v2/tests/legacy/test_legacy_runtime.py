@@ -91,6 +91,9 @@ class FakeView(object):
     def show_restore_result(self):
         self.calls.append("restore")
 
+    def show_restore_error(self):
+        self.calls.append("restore_error")
+
 
 class FakeRestore(object):
     def run(self):
@@ -137,12 +140,14 @@ class FakeSupervisor(object):
 
 class FakeWindowApi(object):
     def __init__(self):
+        self.windows = {10: [100]}
         self.minimized = set()
         self.restore_calls = []
         self.foreground_calls = []
+        self.foreground_succeeds = True
 
     def windows_for_pid(self, pid):
-        return [100] if pid == 10 else []
+        return list(self.windows.get(pid, []))
 
     def is_minimized(self, hwnd):
         return hwnd in self.minimized
@@ -154,7 +159,7 @@ class FakeWindowApi(object):
 
     def bring_to_front(self, hwnd):
         self.foreground_calls.append(hwnd)
-        return True
+        return self.foreground_succeeds
 
 
 class LegacyRuntimeTests(unittest.TestCase):
@@ -230,7 +235,7 @@ class LegacyRuntimeTests(unittest.TestCase):
         self.assertTrue(keyboard.running)
         controller.handle("auth_succeeded")
 
-        self.assertFalse(desktop.running)
+        self.assertTrue(desktop.running)
         self.assertFalse(keyboard.running)
         self.assertEqual("ADMIN_SESSION", controller.state)
         self.assertEqual(3, len(audit.events))
@@ -303,6 +308,96 @@ class LegacyRuntimeTests(unittest.TestCase):
         self.assertEqual("visible", resumed.window_status)
         self.assertEqual([100], windows.foreground_calls)
         self.assertEqual(1, supervisor.start_calls)
+
+    def test_failed_initial_foreground_does_not_restore_on_later_tick(self):
+        supervisor = FakeSupervisor()
+        windows = FakeWindowApi()
+        windows.foreground_succeeds = False
+        runtime = ApplicationRuntime(
+            supervisor,
+            WindowCoordinator(windows),
+            start_maximized=False,
+        )
+
+        started = runtime.start()
+        windows.minimized.add(100)
+        minimized = runtime.tick()
+
+        self.assertEqual("foreground_failed", started.window_status)
+        self.assertEqual("minimized", minimized.window_status)
+        self.assertEqual([], windows.restore_calls)
+        self.assertEqual([100], windows.foreground_calls)
+
+    def test_shell_interaction_brings_visible_application_to_front(self):
+        supervisor = FakeSupervisor()
+        windows = FakeWindowApi()
+        runtime = ApplicationRuntime(supervisor, WindowCoordinator(windows))
+        runtime.start()
+        windows.foreground_calls = []
+
+        result = runtime.bring_to_front()
+
+        self.assertEqual("visible", result.window_status)
+        self.assertEqual([100], windows.foreground_calls)
+        self.assertEqual([], windows.restore_calls)
+
+    def test_shell_interaction_does_not_restore_minimized_application(self):
+        supervisor = FakeSupervisor()
+        windows = FakeWindowApi()
+        runtime = ApplicationRuntime(supervisor, WindowCoordinator(windows))
+        runtime.start()
+        windows.foreground_calls = []
+        windows.minimized.add(100)
+
+        result = runtime.bring_to_front()
+
+        self.assertEqual("minimized", result.window_status)
+        self.assertEqual([], windows.foreground_calls)
+        self.assertEqual([], windows.restore_calls)
+
+    def test_shell_interaction_is_suppressed_during_admin_dialog(self):
+        supervisor = FakeSupervisor()
+        windows = FakeWindowApi()
+        runtime = ApplicationRuntime(supervisor, WindowCoordinator(windows))
+        runtime.start()
+        windows.foreground_calls = []
+
+        result = runtime.bring_to_front(admin_dialog_open=True)
+
+        self.assertEqual("suppressed", result.window_status)
+        self.assertEqual([], windows.foreground_calls)
+
+    def test_pending_window_during_admin_dialog_updates_status_without_focus_steal(self):
+        supervisor = FakeSupervisor()
+        windows = FakeWindowApi()
+        windows.windows[10] = []
+        runtime = ApplicationRuntime(supervisor, WindowCoordinator(windows))
+
+        started = runtime.start()
+        windows.windows[10] = [100]
+        visible = runtime.tick(admin_dialog_open=True)
+
+        self.assertEqual("no_window", started.window_status)
+        self.assertEqual("visible", visible.window_status)
+        self.assertEqual([], windows.restore_calls)
+        self.assertEqual([], windows.foreground_calls)
+
+    def test_pending_window_during_admin_session_reports_minimized_without_focus_steal(self):
+        supervisor = FakeSupervisor()
+        windows = FakeWindowApi()
+        windows.windows[10] = []
+        runtime = ApplicationRuntime(supervisor, WindowCoordinator(windows))
+
+        runtime.start()
+        windows.windows[10] = [100]
+        windows.minimized.add(100)
+        minimized = runtime.tick(admin_session_active=True)
+        later = runtime.tick(admin_session_active=True)
+
+        self.assertEqual("minimized", minimized.window_status)
+        self.assertEqual("minimized", later.window_status)
+        self.assertEqual([], windows.restore_calls)
+        self.assertEqual([], windows.foreground_calls)
 
 
 if __name__ == "__main__":

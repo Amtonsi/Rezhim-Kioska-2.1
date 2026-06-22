@@ -30,6 +30,7 @@ class LauncherSession(object):
         tick_interval_ms=250,
         audit=None,
         change_application=None,
+        restore_action=None,
     ):
         self.root = root
         self.controller = controller
@@ -44,6 +45,7 @@ class LauncherSession(object):
         self.tick_interval_ms = max(50, int(tick_interval_ms))
         self.audit = audit
         self.change_application = change_application
+        self.restore_action = restore_action
         self.admin_expires_at = None
         self.running = False
         self.isolation_degraded = False
@@ -63,6 +65,8 @@ class LauncherSession(object):
             self.keyboard.stop()
         finally:
             self.desktop.stop()
+        self.recovery.restore_shell_surfaces()
+        self.recovery.start_explorer()
 
     def handle_action(self, action):
         state = self.controller.state
@@ -80,8 +84,9 @@ class LauncherSession(object):
         if state != "ADMIN_SESSION":
             return
         if action == "unlockDesktop":
-            self.recovery.restore_shell_surfaces()
-            self.recovery.start_explorer()
+            self.close()
+            self.root.destroy()
+            return
         elif action == "toggleSupervision":
             if self.application.enabled:
                 self.application.stop_supervision()
@@ -91,11 +96,57 @@ class LauncherSession(object):
             self.admin_expires_at = None
             self.controller.handle("return_to_kiosk")
         elif action == "changeApplication" and self.change_application is not None:
-            self.change_application()
+            try:
+                replacement = self.change_application()
+            except Exception as error:
+                self._audit(
+                    "change_application_failed",
+                    {"errorType": error.__class__.__name__},
+                )
+                show_error = getattr(self.view, "show_change_application_error", None)
+                if show_error is not None:
+                    show_error()
+            else:
+                if replacement is not None:
+                    self.application.stop_supervision()
+                    self.application = replacement
+                    if hasattr(self.controller.effects, "supervisor"):
+                        self.controller.effects.supervisor = replacement
+                    self.application.start()
+                    self._audit(
+                        "change_application_completed",
+                        {"path": self.application.application_path},
+                    )
         elif action == "restore":
+            supervision_was_enabled = bool(self.application.enabled)
             self.application.stop_supervision()
             self.controller.handle("restore_requested")
-            self.controller.handle("restore_completed")
+            try:
+                if self.restore_action is None:
+                    raise RuntimeError("Restore action is unavailable")
+                self.restore_action.run()
+            except Exception as error:
+                self.view.set_restore_error(
+                    "Восстановление не выполнено. Код/тип ошибки: {0}.".format(
+                        getattr(error, "exit_code", error.__class__.__name__)
+                    )
+                )
+                self._audit(
+                    "restore_failed",
+                    {
+                        "errorType": error.__class__.__name__,
+                        "exitCode": getattr(error, "exit_code", None),
+                    },
+                )
+                self.controller.handle("restore_failed")
+                if supervision_was_enabled:
+                    self.application.resume_supervision()
+            else:
+                self._audit("restore_completed", {})
+                self.controller.handle("restore_completed")
+                self.running = False
+                self.root.destroy()
+                return
         self.view.refresh()
 
     def submit_credentials(self, username, password):
@@ -113,6 +164,14 @@ class LauncherSession(object):
         if self.controller.state == "ADMIN_DIALOG":
             self.controller.handle("auth_cancelled")
 
+    def handle_shell_interaction(self):
+        if self.controller.state != "OPERATOR":
+            return
+        self.application.bring_to_front(
+            admin_dialog_open=False,
+            admin_session_active=False,
+        )
+
     def tick(self):
         state = self.controller.state
         if (
@@ -124,12 +183,17 @@ class LauncherSession(object):
             self.controller.handle("return_to_kiosk")
             state = self.controller.state
 
-        if state in ("OPERATOR", "ADMIN_DIALOG"):
+        if state in ("OPERATOR", "ADMIN_DIALOG", "ADMIN_SESSION"):
             if state == "ADMIN_DIALOG":
                 self.keyboard.enter_admin_dialog()
             isolation = self.desktop.tick()
             failed = getattr(isolation, "failed_pids", ()) if isolation is not None else ()
-            self.isolation_degraded = bool(failed)
+            fallback = (
+                getattr(isolation, "fallback_active", False)
+                if isolation is not None
+                else False
+            )
+            self.isolation_degraded = bool(failed or fallback)
 
         self.application.tick(
             admin_dialog_open=state == "ADMIN_DIALOG",
@@ -145,6 +209,9 @@ class LauncherSession(object):
         return {
             "application_path": getattr(self.application, "application_path", ""),
             "app_status": "minimized" if window_status == "minimized" else "running",
+            "application_configured": bool(
+                getattr(self.application, "configured", True)
+            ),
             "supervision_enabled": bool(self.application.enabled),
             "isolation_degraded": self.isolation_degraded,
         }
@@ -174,6 +241,8 @@ class LauncherSession(object):
 
 
 class ObservedApplication(object):
+    configured = True
+
     def __init__(self, runtime, application_path):
         self.runtime = runtime
         self.application_path = application_path
@@ -195,6 +264,10 @@ class ObservedApplication(object):
         self.latest_result = self.runtime.restore_application(**context)
         return self.latest_result
 
+    def bring_to_front(self, **context):
+        self.latest_result = self.runtime.bring_to_front(**context)
+        return self.latest_result
+
     def stop_supervision(self):
         self.latest_result = self.runtime.stop_supervision()
         return self.latest_result
@@ -202,3 +275,40 @@ class ObservedApplication(object):
     def resume_supervision(self):
         self.latest_result = self.runtime.resume_supervision()
         return self.latest_result
+
+
+class UnconfiguredApplication(object):
+    configured = False
+
+    def __init__(self, application_path):
+        self.application_path = application_path
+        self.latest_result = None
+
+    @property
+    def enabled(self):
+        return False
+
+    def start(self):
+        return None
+
+    def tick(self, **_context):
+        return None
+
+    def restore_application(self, **_context):
+        return None
+
+    def bring_to_front(self, **_context):
+        return None
+
+    def stop_supervision(self):
+        return None
+
+    def resume_supervision(self):
+        return None
+
+
+def select_application(runtime_settings, file_exists, configured_factory):
+    path = runtime_settings.application.path
+    if not runtime_settings.application_configured or not file_exists(path):
+        return UnconfiguredApplication(path)
+    return configured_factory(runtime_settings)

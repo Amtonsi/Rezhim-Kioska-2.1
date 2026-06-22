@@ -17,7 +17,7 @@ class LauncherBootstrap(object):
         self.session_factory = session_factory
 
     def run(self):
-        config = self.config_repository.load(require_existing_app=True)
+        config = self.config_repository.load(require_existing_app=False)
         settings = self.settings_factory.build(config)
         self.dpi.enable()
         root = self.root_factory()

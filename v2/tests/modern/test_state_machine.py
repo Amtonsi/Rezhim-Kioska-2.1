@@ -34,7 +34,7 @@ class ModernStateMachineTests(unittest.TestCase):
         self.assertNotIn("stop_desktop_isolation", request.effects)
         self.assertEqual("OPERATOR", failure.to_state)
 
-    def test_stops_guards_only_after_authentication_success(self):
+    def test_stops_keyboard_only_after_authentication_success(self):
         machine = StateMachine(behavior())
         machine.dispatch("boot_completed")
         machine.dispatch("unlock_requested")
@@ -43,7 +43,7 @@ class ModernStateMachineTests(unittest.TestCase):
 
         self.assertEqual("ADMIN_SESSION", result.to_state)
         self.assertIn("stop_keyboard_guard", result.effects)
-        self.assertIn("stop_desktop_isolation", result.effects)
+        self.assertNotIn("stop_desktop_isolation", result.effects)
 
     def test_rejects_undefined_transition_without_changing_state(self):
         machine = StateMachine(behavior())

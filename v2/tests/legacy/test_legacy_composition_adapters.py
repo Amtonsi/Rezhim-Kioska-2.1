@@ -86,9 +86,18 @@ class LegacyCompositionAdapterTests(unittest.TestCase):
         self.assertEqual("test", runtime.operator_user)
         self.assertEqual(config["allowedApplication"]["path"], runtime.application.path)
         self.assertEqual(("--profile", "Operator One"), runtime.application.arguments)
+        self.assertFalse(runtime.application_configured)
         self.assertTrue(runtime.security.allow_win_l)
         self.assertTrue(runtime.security.keyboard_guard_required)
         self.assertTrue(runtime.testing.restore_after_test)
+
+    def test_missing_configured_field_keeps_legacy_configuration_enabled(self):
+        config = default_config()
+        del config["allowedApplication"]["configured"]
+
+        runtime = RuntimeSettingsFactory(FakeArgumentParser()).build(config)
+
+        self.assertTrue(runtime.application_configured)
 
     def test_runtime_settings_reject_password_like_field_without_value(self):
         config = default_config()

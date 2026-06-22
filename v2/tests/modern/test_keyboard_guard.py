@@ -212,6 +212,26 @@ class KeyboardGuardTests(unittest.TestCase):
             native.next_calls,
         )
 
+    def test_native_loop_does_not_treat_stale_async_win_state_as_text_shortcut(self):
+        native = FakeNativeHookApi()
+        native.down.add(VK_LWIN)
+        blocked = []
+        loop = NativeHookLoop(native=native, on_blocked=blocked.append)
+
+        text_result = loop.dispatch_for_test(0, WM_KEYDOWN, ord("A"))
+
+        self.assertEqual(42, text_result)
+        self.assertEqual([], blocked)
+        self.assertEqual([(None, 0, WM_KEYDOWN, ord("A"))], native.next_calls)
+
+    def test_explicit_win_key_event_still_blocks_win_shortcuts(self):
+        native = FakeNativeHookApi()
+        loop = NativeHookLoop(native=native)
+
+        self.assertEqual(1, loop.dispatch_for_test(0, WM_KEYDOWN, VK_LWIN))
+        self.assertEqual(1, loop.dispatch_for_test(0, WM_KEYDOWN, ord("R")))
+        self.assertEqual([], native.next_calls)
+
     def test_native_loop_installs_and_uninstalls_hook_on_its_message_thread(self):
         native = FakeNativeHookApi()
         loop = NativeHookLoop(native=native)

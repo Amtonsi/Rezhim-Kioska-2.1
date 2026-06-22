@@ -30,6 +30,7 @@ from kiosk_v2_legacy.platform.keyboard_guard import (
     WM_KEYDOWN,
     WM_KEYUP,
 )
+from kiosk_v2_legacy.platform.shell_mode import CurrentShellMode
 
 
 class FakeDesktopApi(object):
@@ -71,6 +72,21 @@ class FakeDesktopApi(object):
     def show_window(self, hwnd):
         self.show_calls.append(hwnd)
         return True
+
+
+class FakeShellRegistry(object):
+    def __init__(self, value):
+        self.value = value
+
+    def read_shell(self):
+        return self.value
+
+
+class FakeArgumentParser(object):
+    def parse(self, value):
+        if value == "malformed":
+            raise ValueError("invalid shell command")
+        return (value.strip('"'),)
 
 
 class TrackingDesktopNative(NativeDesktopProcessApi):
@@ -180,6 +196,38 @@ class LegacySecurityGuardTests(unittest.TestCase):
         self.assertEqual([10, 20], api.terminate_calls)
         self.assertEqual([100, 101, 200], api.show_calls)
 
+    def test_manual_launch_hides_shell_without_terminating_explorer(self):
+        api = FakeDesktopApi()
+        guard = DesktopIsolation(api, terminate_explorer=False)
+
+        result = guard.start()
+        guard.tick()
+
+        self.assertEqual([], api.terminate_calls)
+        self.assertEqual([100, 101, 100, 101], api.hide_calls)
+        self.assertTrue(result.fallback_active)
+        guard.stop()
+        self.assertEqual([100, 101], api.show_calls)
+
+    def test_current_shell_mode_enables_strict_isolation_only_for_launcher(self):
+        launcher = r"C:\ProgramData\Kiosk\KioskLauncherLegacy.exe"
+        strict = CurrentShellMode(
+            FakeShellRegistry('"' + launcher + '"'),
+            FakeArgumentParser(),
+        )
+        manual = CurrentShellMode(
+            FakeShellRegistry("explorer.exe"),
+            FakeArgumentParser(),
+        )
+        malformed = CurrentShellMode(
+            FakeShellRegistry("malformed"),
+            FakeArgumentParser(),
+        )
+
+        self.assertTrue(strict.is_launcher_shell(launcher))
+        self.assertFalse(manual.is_launcher_shell(launcher))
+        self.assertFalse(malformed.is_launcher_shell(launcher))
+
     def test_native_desktop_termination_closes_handle_on_success_and_error(self):
         native = TrackingDesktopNative()
         self.assertTrue(native.terminate_process(10))
@@ -236,6 +284,25 @@ class LegacySecurityGuardTests(unittest.TestCase):
 
         self.assertEqual(77, native.asserted_thread_id)
         self.assertEqual([500], native.uninstalled)
+
+    def test_native_hook_loop_ignores_stale_async_win_state_for_text(self):
+        native = FakeHookNative()
+        native.down.add(VK_LWIN)
+        blocked = []
+        loop = NativeHookLoop(native=native, on_blocked=blocked.append)
+
+        self.assertEqual(42, loop.dispatch_for_test(0, WM_KEYDOWN, ord("A")))
+
+        self.assertEqual([], blocked)
+        self.assertEqual([(None, 0, WM_KEYDOWN, ord("A"))], native.next_calls)
+
+    def test_native_hook_loop_still_blocks_explicit_win_shortcuts(self):
+        native = FakeHookNative()
+        loop = NativeHookLoop(native=native)
+
+        self.assertEqual(1, loop.dispatch_for_test(0, WM_KEYDOWN, VK_LWIN))
+        self.assertEqual(1, loop.dispatch_for_test(0, WM_KEYDOWN, ord("R")))
+        self.assertEqual([], native.next_calls)
 
     def test_keyboard_guard_stays_active_through_dialog_then_stops_on_success(self):
         hook = FakeHookLoop()

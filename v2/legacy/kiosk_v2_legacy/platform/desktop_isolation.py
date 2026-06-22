@@ -46,17 +46,30 @@ class ShellSurface(object):
 
 
 class IsolationResult(object):
-    __slots__ = ("terminated_pids", "failed_pids", "hidden_hwnds")
+    __slots__ = (
+        "terminated_pids",
+        "failed_pids",
+        "hidden_hwnds",
+        "fallback_active",
+    )
 
-    def __init__(self, terminated_pids=(), failed_pids=(), hidden_hwnds=()):
+    def __init__(
+        self,
+        terminated_pids=(),
+        failed_pids=(),
+        hidden_hwnds=(),
+        fallback_active=False,
+    ):
         self.terminated_pids = tuple(terminated_pids)
         self.failed_pids = tuple(failed_pids)
         self.hidden_hwnds = tuple(hidden_hwnds)
+        self.fallback_active = bool(fallback_active)
 
 
 class DesktopIsolation(object):
-    def __init__(self, desktop_api):
+    def __init__(self, desktop_api, terminate_explorer=True):
         self.desktop_api = desktop_api
+        self.terminate_explorer = bool(terminate_explorer)
         self.running = False
         self._hidden_set = set()
         self._hidden_order = []
@@ -92,6 +105,8 @@ class DesktopIsolation(object):
             if basename != "explorer.exe":
                 continue
             explorer_pids.add(process.pid)
+            if not self.terminate_explorer:
+                continue
             if self.desktop_api.terminate_process(process.pid):
                 terminated.append(process.pid)
             else:
@@ -111,7 +126,12 @@ class DesktopIsolation(object):
                 if surface.hwnd not in self._hidden_set:
                     self._hidden_set.add(surface.hwnd)
                     self._hidden_order.append(surface.hwnd)
-        return IsolationResult(terminated, failed, hidden)
+        return IsolationResult(
+            terminated,
+            failed,
+            hidden,
+            fallback_active=bool(explorer_pids) and not self.terminate_explorer,
+        )
 
 
 class LegacyDesktopApi(object):
