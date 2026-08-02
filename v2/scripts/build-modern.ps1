@@ -9,6 +9,9 @@ $workLauncher = Join-Path $projectRoot "v2\build\work-modern-launcher"
 $workRestore = Join-Path $projectRoot "v2\build\work-modern-restore"
 $workConfigurator = Join-Path $projectRoot "v2\build\work-modern-configurator"
 
+& (Join-Path $PSScriptRoot "test-build-inputs.ps1") `
+    -Family Modern -ProjectRoot $projectRoot
+
 if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
     throw "Python 3.8 x86 was not found: $Python"
 }
@@ -18,6 +21,15 @@ try {
     & $Python -c "import struct; raise SystemExit(0 if struct.calcsize('P') == 4 else 1)"
     if ($LASTEXITCODE -ne 0) {
         throw "Modern build requires 32-bit Python."
+    }
+
+    & $Python -m unittest discover -s "v2\tests\modern" -p "test_*.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Modern unit tests failed; build was not started."
+    }
+    & $Python -m unittest discover -s "v2\tests" -p "test_build_contract.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "V2 build contract tests failed; build was not started."
     }
 
     & $Python -m PyInstaller --noconfirm --clean `

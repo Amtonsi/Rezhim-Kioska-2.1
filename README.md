@@ -289,6 +289,11 @@ python -m pip install -r requirements-modern-build.txt
 powershell -NoProfile -ExecutionPolicy Bypass -File .\v2\scripts\build-modern.ps1
 ```
 
+Скрипт до первого запуска PyInstaller проверяет наличие всех entrypoint/spec/config
+файлов и запускает Modern-тесты вместе с контрактами сборки. В GitHub Actions та же
+сборка автоматически выполняется на Windows с Python 3.8 x86 при каждом обновлении
+`main`.
+
 ### Legacy
 
 Требуется 32-битный Python 2.7 и совместимый PyInstaller 3.2.1:
@@ -296,6 +301,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\v2\scripts\build-modern.ps
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\v2\scripts\build-legacy.ps1
 ```
+
+Legacy-скрипт также выполняет проверку полного набора входных файлов и тесты до
+начала упаковки EXE.
 
 Legacy-toolchain должен находиться в `v2\toolchain\pyinstaller-3.2.1` либо передаваться параметром `-Toolchain`. Готовая Legacy-сборка публикуется в Releases, поэтому для обычного использования Python не нужен.
 

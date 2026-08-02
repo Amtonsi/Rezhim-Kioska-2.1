@@ -15,6 +15,9 @@ $workLauncher = Join-Path $projectRoot "v2\build\work-legacy-launcher"
 $workRestore = Join-Path $projectRoot "v2\build\work-legacy-restore"
 $workConfigurator = Join-Path $projectRoot "v2\build\work-legacy-configurator"
 
+& (Join-Path $PSScriptRoot "test-build-inputs.ps1") `
+    -Family Legacy -ProjectRoot $projectRoot
+
 function Reset-ProjectDirectory {
     param([string]$Path)
 
@@ -66,6 +69,15 @@ try {
     & $Python -c "import struct, pywintypes, win32api; raise SystemExit(0 if struct.calcsize('P') == 4 else 1)"
     if ($LASTEXITCODE -ne 0) {
         throw "Legacy build requires Python 2.7 x86 and the local pywin32 runtime."
+    }
+
+    & $Python -m unittest discover -s "v2\tests\legacy" -p "test_*.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Legacy unit tests failed; build was not started."
+    }
+    & $Python -m unittest discover -s "v2\tests" -p "test_build_contract.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "V2 build contract tests failed; build was not started."
     }
 
     Reset-ProjectDirectory -Path $distPath
