@@ -173,5 +173,33 @@ class OperatorRegistryTests(unittest.TestCase):
         self.assertNotIn("subprocess", source)
 
 
+class NativeHiveUnloadTests(unittest.TestCase):
+    def test_only_owned_hives_are_unloaded_and_errors_preserve_ownership(self):
+        from kiosk_v2_modern.platform.operator_registry import WindowsRegistryApi, winreg
+
+        class Native(object):
+            def __init__(self):
+                self.calls = []
+                self.status = 5
+
+            def RegUnLoadKeyW(self, parent, name):
+                self.calls.append((parent, name))
+                return self.status
+
+        native = Native()
+        api = WindowsRegistryApi.__new__(WindowsRegistryApi)
+        api.advapi32 = native
+        api._loaded_roots = set(("KioskV2_test",))
+        api.unmount_operator_hive("already_logged_in")
+        self.assertEqual([], native.calls)
+        with self.assertRaises(OSError):
+            api.unmount_operator_hive("KioskV2_test")
+        self.assertIn("KioskV2_test", api._loaded_roots)
+        native.status = 0
+        api.unmount_operator_hive("KioskV2_test")
+        self.assertEqual([(winreg.HKEY_USERS, "KioskV2_test")] * 2, native.calls)
+        self.assertFalse(api._loaded_roots)
+
+
 if __name__ == "__main__":
     unittest.main()

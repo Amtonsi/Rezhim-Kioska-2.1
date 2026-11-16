@@ -54,7 +54,6 @@ class AdminActionLauncher(object):
         backup_path = os.path.join(directory, "state", "backup-v2.json")
         if os.path.isfile(backup_path):
             self._run_checked(self.restore_executable, "restore --apply")
-        self._run_checked(self.restore_executable, "recover-desktop --apply")
         return True
 
     def change_application(self):

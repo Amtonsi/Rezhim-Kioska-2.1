@@ -13,18 +13,14 @@ def read_text(path):
 
 
 class DualReleaseDocumentationTests(unittest.TestCase):
-    def test_readme_puts_manual_two_file_choice_first(self):
+    def test_readme_links_both_release_formats_for_each_build(self):
         text = read_text("README.md")
 
-        self.assertIn("XP SP1-SP3 / Server 2003", text)
-        self.assertIn("RezhimKioska-Legacy.exe", text)
-        self.assertIn("Windows 7 SP1-11", text)
-        self.assertIn("RezhimKioska-Modern.exe", text)
-        self.assertIn("третьего загрузчика", text)
-        self.assertIn(r"release\package\PythonKiosk-GitHub.zip", text)
-        self.assertIn(r"release\package\SHA256SUMS.txt", text)
-        self.assertNotIn(r"release\RezhimKioska.exe", text)
-        self.assertNotIn(r"dist\RezhimKioska.exe", text)
+        for target in ("Windows10-11-x64", "Windows7-Compat-x86", "WindowsXP-Legacy-x86"):
+            for extension in ("exe", "zip"):
+                self.assertIn("RezhimKioska-2.1.0-{0}.{1})".format(target, extension), text)
+        self.assertIn("/releases/download/v2.1.0/SHA256SUMS.txt", text)
+        self.assertIn("docs/VMWARE-2.1.md", text)
 
     def test_install_and_restore_document_both_command_families(self):
         install = read_text(os.path.join("docs", "INSTALL.md"))

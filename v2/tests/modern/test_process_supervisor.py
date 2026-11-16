@@ -153,7 +153,7 @@ class ExistingNameHandoffApi(FakeProcessApi):
         self.running[handoff_pid] = True
         self.paths[handoff_pid] = self.HANDOFF_PATH
 
-    def find_existing_by_name(self, path):
+    def find_existing_broker(self, path):
         self.find_by_name_calls += 1
         return [ProcessRef(self.handoff_pid, self.HANDOFF_PATH, True)]
 
@@ -179,6 +179,29 @@ class TemporarilyFailingHandoffApi(DelayedDifferentPathHandoffApi):
 
 
 class ProcessSupervisorTests(unittest.TestCase):
+    def test_tracks_wow64_redirected_image_but_launches_configured_name(self):
+        configured = r"C:\Windows\System32\notepad.exe"
+        physical = r"C:\Windows\SysWOW64\notepad.exe"
+
+        class RedirectedApi(FakeProcessApi):
+            def resolve_configured_path(self, path):
+                return physical
+
+            def start(self, application):
+                process = super(RedirectedApi, self).start(application)
+                self.paths[process.pid] = physical
+                self.existing[0].path = physical
+                return ProcessRef(process.pid, configured, True)
+
+        api = RedirectedApi(existing=[])
+        supervisor = ProcessSupervisor(settings(path=configured), api, FakeClock())
+        self.assertEqual("started", supervisor.start().status)
+        self.assertEqual("running", supervisor.tick().status)
+        self.assertEqual(configured, api.start_calls[0].path)
+        second = ProcessSupervisor(settings(path=configured), api, FakeClock())
+        self.assertEqual("adopted", second.start().status)
+        self.assertEqual(1, len(api.start_calls))
+
     def test_adopts_one_existing_exact_path_process_without_starting_duplicate(self):
         existing = ProcessRef(10, r"c:/program files/vendor/ALLOWED.exe", True)
         api = FakeProcessApi(existing=[existing])

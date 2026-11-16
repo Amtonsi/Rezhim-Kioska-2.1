@@ -10,6 +10,8 @@ import os
 import sys
 import tempfile
 
+from kiosk_v2_legacy.platform.log_path import PROFILE_LOG_DIRECTORY
+
 from ctypes import wintypes
 
 
@@ -55,7 +57,8 @@ class LegacyConfigValidator(object):
             raise ConfigValidationError(
                 "$.allowedApplication.workingDirectory", "absolute_path_required"
             )
-        if not ntpath.isabs(data["logging"]["logDirectory"]):
+        log_directory = data["logging"]["logDirectory"].strip()
+        if log_directory != PROFILE_LOG_DIRECTORY and not ntpath.isabs(log_directory):
             raise ConfigValidationError("$.logging.logDirectory", "absolute_path_required")
         return copy.deepcopy(data)
 

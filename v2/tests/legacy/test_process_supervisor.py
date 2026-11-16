@@ -163,7 +163,7 @@ class ExistingNameHandoffApi(FakeProcessApi):
         self.running[handoff_pid] = True
         self.paths[handoff_pid] = self.HANDOFF_PATH
 
-    def find_existing_by_name(self, path):
+    def find_existing_broker(self, path):
         self.find_by_name_calls += 1
         return [ProcessRef(self.handoff_pid, self.HANDOFF_PATH, True)]
 

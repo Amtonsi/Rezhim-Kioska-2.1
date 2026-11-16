@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 from kiosk_v2_legacy.app.process_supervisor import ApplicationSettings
+from kiosk_v2_legacy.platform.log_path import resolve_log_directory
 
 
 try:
@@ -143,7 +144,7 @@ class RuntimeSettingsFactory(object):
         )
         log_data = config["logging"]
         logging_settings = LoggingSettings(
-            log_data["logDirectory"],
+            resolve_log_directory(log_data["logDirectory"]),
             log_data["level"],
             log_data["maxBytes"],
             log_data["backupCount"],

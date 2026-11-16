@@ -40,12 +40,14 @@ class InstallService(object):
         install_directory,
         launcher_path,
         config_path,
+        protect_allowed_app=True,
     ):
         self.preflight = preflight
         self.profile_locator = profile_locator
         self.registry_factory = registry_factory
         self.acl_manager = acl_manager
         self.artifacts = artifacts
+        self.protect_allowed_app = protect_allowed_app
         self.backup_store = backup_store
         self.install_directory = self._normalize(install_directory)
         self.launcher_path = self._normalize(launcher_path)
@@ -93,6 +95,8 @@ class InstallService(object):
         profile_path = self.profile_locator.get_profile_path(identity.sid)
         operation_ids = self._operation_ids(allowed_path)
         if dry_run:
+            if not save_original_backup or os.path.exists(self.backup_store.path):
+                self.backup_store.load("modern", identity.sid)
             return InstallResult(operation_ids, True, True)
 
         registry = self.registry_factory(identity.sid, profile_path)
@@ -123,7 +127,7 @@ class InstallService(object):
             "fileAcls": [snapshot.to_dict() for snapshot in acl_snapshots],
             "configBackup": artifact_snapshot,
         }
-        if save_original_backup:
+        if save_original_backup and not os.path.exists(self.backup_store.path):
             self.backup_store.save(metadata)
         self.backup_store.load(
             expected_build_family="modern",
@@ -238,7 +242,7 @@ class InstallService(object):
             ("launcher", self.launcher_path, True),
             ("config", self.config_path, False),
         ]
-        if self._is_inside_install_directory(allowed_path):
+        if self.protect_allowed_app and self._is_inside_install_directory(allowed_path):
             candidates.append(("allowed_application", allowed_path, True))
         unique = []
         seen = set()

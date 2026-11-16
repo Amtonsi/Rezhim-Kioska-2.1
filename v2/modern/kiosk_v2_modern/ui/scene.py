@@ -71,6 +71,29 @@ def _application_name(path):
     return ntpath.basename(path) or path
 
 
+def _application_status(status, diagnostics):
+    descriptions = {
+        "running": ("Работает", "Приложение запущено. При сворачивании появится кнопка возврата."),
+        "minimized": ("Свернуто", "Нажмите кнопку, чтобы развернуть окно приложения."),
+        "crash_loop": ("Частые сбои", "Достигнут предел попыток запуска. Администратор может возобновить надзор."),
+        "conflict": ("Конфликт", "Найдено несколько процессов разрешённого приложения."),
+        "start_failed": ("Ошибка запуска", "Windows не удалось запустить приложение."),
+        "waiting_restart": ("Перезапуск", "Киоск ожидает следующей попытки запуска."),
+        "waiting_handoff": ("Ожидание", "Киоск ищет основной процесс после выхода загрузчика приложения."),
+        "stopped": ("Без надзора", "Киоск прекратил наблюдение за приложением."),
+        "pending": ("Проверка", "Киоск проверяет состояние приложения."),
+    }
+    label, hint = descriptions.get(status, ("Неизвестно", "Киоск не получил состояние приложения."))
+    if status == "conflict" and diagnostics.get("conflict_pids"):
+        hint += " PID: {0}.".format(", ".join(str(pid) for pid in diagnostics["conflict_pids"][:5]))
+    if status in ("start_failed", "crash_loop"):
+        if diagnostics.get("error_code"):
+            hint += " Ошибка: {0}.".format(diagnostics["error_code"])
+        if diagnostics.get("failure_count"):
+            hint += " Число сбоев: {0}.".format(diagnostics["failure_count"])
+    return label, hint
+
+
 def build_operator_scene(
     application_path,
     app_status="running",
@@ -78,19 +101,23 @@ def build_operator_scene(
     admin_session_active=False,
     supervision_enabled=True,
     isolation_degraded=False,
+    app_diagnostics=None,
 ):
     application_configured = bool(application_configured)
     minimized = application_configured and app_status == "minimized"
     if application_configured:
         application_name = _application_name(application_path)
         application_path_text = application_path
-        status_text = "Свернуто" if minimized else "Работает"
-        status_fill = "#3a1616" if minimized else "#0f2f1f"
-        status_color = THEME["danger"] if minimized else THEME["ok"]
+        status_text, hint_text = _application_status(app_status, app_diagnostics or {})
+        if app_status == "running":
+            status_fill, status_color = "#0f2f1f", THEME["ok"]
+        elif app_status in ("minimized", "crash_loop", "conflict", "start_failed"):
+            status_fill, status_color = "#3a1616", THEME["danger"]
+        else:
+            status_fill, status_color = "#122033", THEME["accent"]
         supervision_text = (
             "Надзор: включен" if supervision_enabled else "Надзор: остановлен"
         )
-        hint_text = "Приложение работает поверх оболочки. При сворачивании появится кнопка возврата."
     else:
         application_name = "Не выбрано"
         application_path_text = "Разрешенное приложение не настроено."
@@ -113,7 +140,7 @@ def build_operator_scene(
         _text("header_year_text", "2026", 276, 29, 62, 48, 10, "#67e8f9", False, "center"),
         _text(
             "header_subtitle",
-            "Режим оператора: Explorer не запущен.",
+            "Рабочий стол оператора",
             50,
             88,
             760,
@@ -125,7 +152,7 @@ def build_operator_scene(
         _text("allowed_title", "Разрешенное приложение", 92, 190, 650, 44, 26, THEME["text"], True),
         _text(
             "allowed_subtitle",
-            "Запущено только настроенное приложение.",
+            "Состояние обновляется, пока включён надзор." if application_configured else "Приложение выбирает администратор.",
             94,
             238,
             650,
@@ -147,7 +174,7 @@ def build_operator_scene(
         _text(
             "safety_message",
             (
-                "Защита ограничена: Explorer обнаружен. Вернитесь в киоск после устранения причины."
+                "Защита ограничена. Киоск обнаружил Explorer после включения изоляции."
                 if isolation_degraded
                 else "Win+L остается доступен. Службы, драйверы, процессы и автозагрузка не трогаются."
             ),

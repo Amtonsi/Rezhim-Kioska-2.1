@@ -65,7 +65,7 @@ class FileAclTests(unittest.TestCase):
                 execute=False,
             )
 
-            self.assertIn("(A;;GR;;;S-1-5-21-1-2-3-1001)", sddl)
+            self.assertIn("(A;;FR;;;S-1-5-21-1-2-3-1001)", sddl)
             self.assertNotIn("GW;;;S-1-5-21-1-2-3-1001", sddl)
             self.assertNotIn("GA;;;S-1-5-21-1-2-3-1001", sddl)
             self.assertTrue(manager.verify(path, sddl))
@@ -81,7 +81,7 @@ class FileAclTests(unittest.TestCase):
                 execute=True,
             )
 
-            self.assertIn("(A;OICI;GRGX;;;S-1-5-21-1-2-3-1001)", sddl)
+            self.assertIn("(A;OICI;0x1200a9;;;S-1-5-21-1-2-3-1001)", sddl)
             self.assertIn("(A;OICI;FA;;;SY)", sddl)
             self.assertIn("(A;OICI;FA;;;BA)", sddl)
 

@@ -170,6 +170,8 @@ class WindowsRegistryApi(object):
         self._configure_signatures()
 
     def _configure_signatures(self):
+        self.advapi32.RegUnLoadKeyW.argtypes = [wintypes.HKEY, wintypes.LPCWSTR]
+        self.advapi32.RegUnLoadKeyW.restype = wintypes.LONG
         self.kernel32.GetCurrentProcess.argtypes = []
         self.kernel32.GetCurrentProcess.restype = wintypes.HANDLE
         self.kernel32.GetLastError.argtypes = []
@@ -214,10 +216,10 @@ class WindowsRegistryApi(object):
     def unmount_operator_hive(self, root):
         if root not in self._loaded_roots:
             return
-        try:
-            winreg.UnloadKey(winreg.HKEY_USERS, root)
-        finally:
-            self._loaded_roots.discard(root)
+        status = self.advapi32.RegUnLoadKeyW(winreg.HKEY_USERS, root)
+        if status != 0:
+            raise OSError(status, "RegUnLoadKeyW failed")
+        self._loaded_roots.discard(root)
 
     def read_value(self, root, key_path, value_name):
         full_path = root + "\\" + key_path

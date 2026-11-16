@@ -1,5 +1,7 @@
 ﻿# Безопасность
 
+> Этот документ относится к предыдущим выпускам. Для версии 2.1 используем [инструкцию по установке и откату](../README.md) и [протокол испытаний в VMware](VMWARE-2.1.md).
+
 ## Границы двух сборок
 
 Modern предназначен для Windows 7 SP1-11. Legacy собран Python 2.7.18 x86 и PyInstaller 3.2.1 для XP SP1-SP3/Server 2003 x86. Python 2.7, этот PyInstaller и NT 5.x сняты с поддержки; Legacy обеспечивает shell replacement, пользовательские политики и watchdog, но не равен современным Enterprise-механизмам AppLocker/Shell Launcher.

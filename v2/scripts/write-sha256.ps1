@@ -9,6 +9,9 @@ if (-not $ProjectRoot) {
 
 $distRoot = Join-Path $ProjectRoot "v2\dist"
 $targets = @(
+    "modern-x64\RezhimKioska-V2-Modern.exe",
+    "modern-x64\Restore-V2-Modern.exe",
+    "modern-x64\Configurator-V2-Modern.exe",
     "modern\RezhimKioska-V2-Modern.exe",
     "modern\Restore-V2-Modern.exe",
     "modern\Configurator-V2-Modern.exe",

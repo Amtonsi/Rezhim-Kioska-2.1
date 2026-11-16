@@ -48,6 +48,13 @@ class AclSnapshot(object):
         return cls(document["path"], document["existed"], document["sddl"])
 
 
+def comparable_file_dacl(sddl):
+    # NTFS may set AUTO_INHERITED even when applying a protected DACL.
+    # Preserve every ACE, its order and the DACL protection flag.
+    flags, separator, aces = sddl.partition("(")
+    return flags.replace("AI", "") + separator + aces
+
+
 class FileAclManager(object):
     def __init__(self, approved_roots, native=None):
         self.approved_roots = tuple(self._normalize(path) for path in approved_roots)
@@ -68,7 +75,8 @@ class FileAclManager(object):
         if not re.match(r"^S-\d+(?:-\d+)+$", operator_sid or ""):
             raise ValueError("valid operator SID required")
         flags = "OICI" if os.path.isdir(path) else ""
-        rights = "GRGX" if execute else "GR"
+        # Use FILE_GENERIC_READ | FILE_GENERIC_EXECUTE to keep inheritable ACEs intact.
+        rights = "0x1200a9" if execute else "FR"
         sddl = "D:P(A;{0};FA;;;SY)(A;{0};FA;;;BA)(A;{0};{1};;;{2})".format(
             flags, rights, operator_sid
         )
@@ -88,13 +96,13 @@ class FileAclManager(object):
 
     def verify(self, path, sddl):
         path = self._approved(path)
-        return os.path.exists(path) and self.native.capture_sddl(path) == sddl
+        return os.path.exists(path) and comparable_file_dacl(self.native.capture_sddl(path)) == comparable_file_dacl(sddl)
 
     def verify_snapshot(self, snapshot):
         path = self._approved(snapshot.path)
         if not snapshot.existed:
             return not os.path.exists(path)
-        return os.path.exists(path) and self.native.capture_sddl(path) == snapshot.sddl
+        return os.path.exists(path) and comparable_file_dacl(self.native.capture_sddl(path)) == comparable_file_dacl(snapshot.sddl)
 
     def _approved(self, path):
         path = self._normalize(path)

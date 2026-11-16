@@ -1,0 +1,2 @@
+# Keep the original formatting of third-party distribution notices.
+docs/distribution-licenses/*/*.txt -whitespace

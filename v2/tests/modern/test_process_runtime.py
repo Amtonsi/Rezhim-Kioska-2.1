@@ -19,6 +19,9 @@ APP_PATH = r"C:\Program Files\Vendor\Allowed.exe"
 
 
 class FakeNativeApi(object):
+    def broker_family_for_launcher(self, path):
+        return None
+
     def __init__(self):
         self.paths = {
             10: r"c:/program files/vendor/ALLOWED.exe",
@@ -44,6 +47,9 @@ class FakeNativeApi(object):
 
 
 class FakeHandoffNative(object):
+    def broker_family_for_launcher(self, path):
+        return None
+
     HANDOFF_PATH = r"C:\Program Files\WindowsApps\Vendor_1.0\Allowed.exe"
 
     def process_parent_map(self):
@@ -63,6 +69,12 @@ class FakeHandoffNative(object):
 class FakeBrokerNative(object):
     EXISTING_PATH = r"C:\Program Files\WindowsApps\Vendor_1.0\Allowed.exe"
     NEW_PATH = r"C:\Program Files\WindowsApps\Vendor_2.0\Allowed.exe"
+
+    def broker_family_for_launcher(self, path):
+        return "expected_family" if path == APP_PATH else None
+
+    def package_family(self, pid):
+        return "expected_family"
 
     def __init__(self):
         self.after_launch = False
@@ -114,9 +126,14 @@ class PopenFactory(object):
 class TrackingNativeRuntime(NativeProcessRuntimeApi):
     def __init__(self):
         self.closed = []
+        self.operator_identity = (b"operator", 1)
+        self.candidate_identity = self.operator_identity
         self.path = APP_PATH
         self.wait_result = 0x00000102
         self.query_error = None
+
+    def _process_identity(self, handle):
+        return self.candidate_identity
 
     def _open_process(self, pid, access):
         return 88
@@ -174,6 +191,7 @@ class ProcessRuntimeTests(unittest.TestCase):
             popen_factory=PopenFactory(),
         )
 
+        runtime.start(ApplicationSettings(APP_PATH))
         found = runtime.find_handoff(100, APP_PATH)
 
         self.assertEqual([200], [item.pid for item in found])
@@ -204,6 +222,34 @@ class ProcessRuntimeTests(unittest.TestCase):
         found = runtime.find_handoff(100, APP_PATH)
 
         self.assertEqual([], found)
+
+    def test_process_with_same_basename_in_unrelated_directory_is_not_adopted(self):
+        native = FakeBrokerNative()
+        native.after_launch = True
+        runtime = WindowsProcessRuntime(native=native, popen_factory=PopenFactory())
+        self.assertEqual([], runtime.find_by_exact_path(APP_PATH))
+        self.assertEqual([], runtime.find_handoff(999, APP_PATH))
+        native.package_family = lambda pid: "unrelated_family"
+        self.assertEqual([], runtime.find_existing_broker(APP_PATH))
+        runtime.start(ApplicationSettings(APP_PATH))
+        self.assertEqual([], runtime.find_handoff(100, APP_PATH))
+
+    def test_broker_family_may_only_be_used_for_trusted_system_launcher(self):
+        native = TrackingNativeRuntime()
+        native._get_package_family = object()
+        native._notepad_launchers = {r"c:\windows\system32\notepad.exe"}
+        self.assertIsNone(native.broker_family_for_launcher(r"C:\Untrusted\notepad.exe"))
+        self.assertEqual(
+            "Microsoft.WindowsNotepad_8wekyb3d8bbwe",
+            native.broker_family_for_launcher(r"C:\Windows\System32\notepad.exe"),
+        )
+
+    def test_liveness_requires_current_user_and_session(self):
+        native = TrackingNativeRuntime()
+        for other_identity in ((b"another_user", 1), (b"operator", 2)):
+            native.candidate_identity = other_identity
+            self.assertFalse(native.is_process_running(10, APP_PATH))
+        self.assertEqual([88, 88], native.closed)
 
     def test_snapshot_failure_does_not_prevent_allowed_application_start(self):
         factory = PopenFactory()

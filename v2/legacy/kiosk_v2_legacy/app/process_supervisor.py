@@ -142,7 +142,7 @@ class ProcessSupervisor(object):
         discovery = self._discover_existing()
         if discovery is not None:
             return discovery
-        discovery = self._discover_existing_by_name()
+        discovery = self._discover_existing_broker()
         if discovery is not None:
             return discovery
         return self._launch("started")
@@ -172,7 +172,7 @@ class ProcessSupervisor(object):
         discovery = self._discover_existing()
         if discovery is not None:
             return discovery
-        discovery = self._discover_existing_by_name()
+        discovery = self._discover_existing_broker()
         if discovery is not None:
             return discovery
         short_lived = (
@@ -211,7 +211,7 @@ class ProcessSupervisor(object):
         if discovery is not None:
             self._restart_due_at = None
             return discovery
-        discovery = self._discover_existing_by_name()
+        discovery = self._discover_existing_broker()
         if discovery is not None:
             self._restart_due_at = None
             return discovery
@@ -264,8 +264,8 @@ class ProcessSupervisor(object):
         self._conflict_pids = ()
         return None
 
-    def _discover_existing_by_name(self):
-        finder = getattr(self.process_api, "find_existing_by_name", None)
+    def _discover_existing_broker(self):
+        finder = getattr(self.process_api, "find_existing_broker", None)
         if finder is None:
             return None
         try:
@@ -386,7 +386,7 @@ class ProcessSupervisor(object):
                 if discovery is not None:
                     self._restart_due_at = None
                     return discovery
-                discovery = self._discover_existing_by_name()
+                discovery = self._discover_existing_broker()
                 if discovery is not None:
                     self._restart_due_at = None
                     return discovery

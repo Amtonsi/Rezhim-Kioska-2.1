@@ -42,7 +42,7 @@ class BuildContractTests(unittest.TestCase):
         }
         for filename, executable_name in expected.items():
             source = self._read("build", filename)
-            self.assertIn("name={0!r}".format(executable_name), source)
+            self.assertIn("name='{0}'".format(executable_name), source)
             self.assertIn("console=True" if "restore" in filename else "console=False", source)
             if "restore" not in filename:
                 self.assertIn("contracts", source)

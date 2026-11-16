@@ -4,6 +4,7 @@ import json
 import ntpath
 import os
 import sys
+from kiosk_v2_modern.platform.interactive_operator import InteractiveOperatorGuard, OperatorLaunchDenied
 import time
 
 
@@ -92,6 +93,9 @@ class LauncherCommand(object):
                 self.family_guard,
                 self.bootstrap_factory,
             ).run()
+        except OperatorLaunchDenied as error:
+            self.error_handler(str(error))
+            return 5
         except RuntimeError as error:
             self.error_handler(str(error))
             return 4
@@ -114,7 +118,8 @@ class ManagedLauncherSession(object):
         try:
             self.session.close()
         finally:
-            for resource in reversed(self.resources):
+            resources, self.resources = self.resources, ()
+            for resource in reversed(resources):
                 try:
                     resource.close()
                 except Exception:
@@ -285,6 +290,7 @@ def build_native_bootstrap(files, root_factory=None):
         WindowsDpiAwareness(),
         root_factory,
         create_session,
+        InteractiveOperatorGuard(),
     )
 
 

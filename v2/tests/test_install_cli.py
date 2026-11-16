@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import tempfile
 import unittest
 
 
@@ -10,6 +11,10 @@ sys.path.insert(0, os.path.join(V2_ROOT, "legacy"))
 
 from kiosk_v2_modern.cli import KioskCli as ModernCli
 from kiosk_v2_legacy.cli import KioskCli as LegacyCli
+
+
+from kiosk_v2_modern import restore_entrypoint as modern_package
+from kiosk_v2_legacy import restore_entrypoint as legacy_package
 
 
 class Result(object):
@@ -65,6 +70,47 @@ class InstallCliTests(unittest.TestCase):
             test_runner=test_runner,
         )
         return cli, install, restore, loader_calls
+
+    def test_packaged_cli_uses_its_config_and_quotes_only_its_launcher(self):
+        for cls, module in ((ModernCli, modern_package), (LegacyCli, legacy_package)):
+            with tempfile.TemporaryDirectory(prefix="kiosk space ") as root:
+                install = FakeInstall()
+                package = module.PackageInstall(root, "", install, None, None)
+                config = {"operatorUser": "test"}
+                paths = []
+
+                def load(path):
+                    paths.append(path)
+                    return config
+
+                cli = cls(package, FakeRestore(), load, config_path=package.config,
+                          launcher_command=package.launcher)
+                self.assertEqual(0, cli.run(["dry-run"]))
+                self.assertEqual([package.config], paths)
+                self.assertEqual([("install", config, '"{0}"'.format(package.launcher), True)], install.calls)
+                with self.assertRaises(ValueError):
+                    package.apply(config, package.launcher + " --unexpected")
+                self.assertEqual(1, len(install.calls))
+
+    def test_preinstalled_package_never_writes_or_removes_existing_binaries(self):
+        for module in (modern_package, legacy_package):
+            with tempfile.TemporaryDirectory() as root:
+                launcher = os.path.join(root, "launcher.exe")
+                with open(launcher, "wb") as stream:
+                    stream.write(b"existing")
+                artifacts = module.PortableArtifacts((launcher,))
+                snapshot = artifacts.capture()
+                artifacts.install()
+                self.assertTrue(artifacts.verify())
+                artifacts.restore(snapshot)
+                artifacts.remove_owned(snapshot)
+                with open(launcher, "rb") as stream:
+                    self.assertEqual(b"existing", stream.read())
+                os.remove(launcher)
+                with self.assertRaises(ValueError):
+                    artifacts.install()
+                artifacts.restore(snapshot)
+                self.assertFalse(os.path.exists(launcher))
 
     def test_install_and_repair_default_to_dry_run_in_both_builds(self):
         for cls in (ModernCli, LegacyCli):

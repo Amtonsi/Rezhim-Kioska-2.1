@@ -1,0 +1,23 @@
+OperatorHiveLoadedBefore=False
+OperatorHiveLoadedBeforeFull=False
+install_artifacts
+protect_acl:install_directory
+protect_acl:launcher
+protect_acl:config
+set_policy:DisableTaskMgr
+set_policy:DisableRegistryTools
+set_policy:DisableCMD
+set_policy:NoRun
+set_policy:NoControlPanel
+set_policy:NoViewContextMenu
+set_policy:NoTrayContextMenu
+set_policy:NoSetTaskbar
+set_policy:NoWinKeys
+set_operator_shell
+dry-run exit=0
+install --apply exit=0
+repair --apply exit=0
+restore --apply exit=0
+PackageFilesUnchanged=True
+SystemNotepadAclUnchanged=True
+TemporaryHiveStillMounted=False

@@ -75,6 +75,22 @@ class TaggedCanvas(object):
 
 
 class RendererTests(unittest.TestCase):
+    def test_desktop_exit_runs_after_canvas_mouse_binding_returns(self):
+        class IdleRoot(object):
+            def after_idle(self, callback, *args):
+                self.pending = lambda: callback(*args)
+
+        for renderer_class, _scene in RENDERERS:
+            module = __import__(renderer_class.__module__, fromlist=["KioskCanvasView"])
+            view = module.KioskCanvasView.__new__(module.KioskCanvasView)
+            view.root = IdleRoot()
+            calls = []
+            view.action_handler = calls.append
+            view._dispatch("unlockDesktop")
+            self.assertEqual([], calls)
+            view.root.pending()
+            self.assertEqual(["unlockDesktop"], calls)
+
     def test_buttons_are_bound_once_and_emit_only_their_action(self):
         for renderer_class, build_scene in RENDERERS:
             canvas = FakeCanvas()

@@ -48,25 +48,46 @@ class LauncherSession(object):
         self.restore_action = restore_action
         self.admin_expires_at = None
         self.running = False
+        self.pending_cleanup = []
         self.isolation_degraded = False
+        self.explorer_reappeared = False
 
     def start(self):
         if self.running:
             return
-        self.controller.handle("boot_completed")
         self.running = True
-        self._schedule_tick()
+        try:
+            self.controller.handle("boot_completed")
+            self._schedule_tick()
+        except BaseException:
+            self._restore_desktop()
+            raise
 
     def close(self):
-        if not self.running:
+        error = self._restore_desktop()
+        if error is not None:
+            raise error
+
+    def _restore_desktop(self):
+        if not self.running and not self.pending_cleanup:
             return
+        actions = [
+            self.keyboard.stop,
+            self.desktop.stop,
+            self.recovery.restore_shell_surfaces,
+            self.recovery.start_explorer,
+        ] if self.running else self.pending_cleanup
         self.running = False
-        try:
-            self.keyboard.stop()
-        finally:
-            self.desktop.stop()
-        self.recovery.restore_shell_surfaces()
-        self.recovery.start_explorer()
+        self.pending_cleanup = []
+        first_error = None
+        for action in actions:
+            try:
+                action()
+            except Exception as error:
+                self.pending_cleanup.append(action)
+                if first_error is None:
+                    first_error = error
+        return first_error
 
     def handle_action(self, action):
         state = self.controller.state
@@ -94,6 +115,8 @@ class LauncherSession(object):
                 self.application.resume_supervision()
         elif action == "returnToKiosk":
             self.admin_expires_at = None
+            self.explorer_reappeared = False
+            self.isolation_degraded = False
             self.controller.handle("return_to_kiosk")
         elif action == "changeApplication" and self.change_application is not None:
             try:
@@ -118,6 +141,7 @@ class LauncherSession(object):
                         {"path": self.application.application_path},
                     )
         elif action == "restore":
+            session_was_running = self.running
             supervision_was_enabled = bool(self.application.enabled)
             self.application.stop_supervision()
             self.controller.handle("restore_requested")
@@ -125,7 +149,10 @@ class LauncherSession(object):
                 if self.restore_action is None:
                     raise RuntimeError("Restore action is unavailable")
                 self.restore_action.run()
+                # Restore the signed-in operator's shell under that same token.
+                self.close()
             except Exception as error:
+                self.running = session_was_running
                 self.view.set_restore_error(
                     "Восстановление не выполнено. Код/тип ошибки: {0}.".format(
                         getattr(error, "exit_code", error.__class__.__name__)
@@ -144,7 +171,6 @@ class LauncherSession(object):
             else:
                 self._audit("restore_completed", {})
                 self.controller.handle("restore_completed")
-                self.running = False
                 self.root.destroy()
                 return
         self.view.refresh()
@@ -187,13 +213,13 @@ class LauncherSession(object):
             if state == "ADMIN_DIALOG":
                 self.keyboard.enter_admin_dialog()
             isolation = self.desktop.tick()
-            failed = getattr(isolation, "failed_pids", ()) if isolation is not None else ()
-            fallback = (
-                getattr(isolation, "fallback_active", False)
-                if isolation is not None
-                else False
+            if getattr(isolation, "terminated_pids", ()):
+                # Winlogon can recreate the default shell between enforcement ticks.
+                self.explorer_reappeared = True
+            self.isolation_degraded = bool(
+                self.explorer_reappeared or getattr(isolation, "failed_pids", ())
+                or getattr(isolation, "fallback_active", False)
             )
-            self.isolation_degraded = bool(failed or fallback)
 
         self.application.tick(
             admin_dialog_open=state == "ADMIN_DIALOG",
@@ -205,10 +231,18 @@ class LauncherSession(object):
 
     def model(self):
         result = getattr(self.application, "latest_result", None)
+        process_status = getattr(result, "process_status", "pending")
         window_status = getattr(result, "window_status", "no_window")
+        if process_status in ("started", "adopted", "running", "restarted"):
+            process_status = "minimized" if window_status == "minimized" else "running"
         return {
             "application_path": getattr(self.application, "application_path", ""),
-            "app_status": "minimized" if window_status == "minimized" else "running",
+            "app_status": process_status,
+            "app_diagnostics": {
+                "error_code": getattr(result, "error_code", None),
+                "failure_count": getattr(result, "failure_count", 0),
+                "conflict_pids": getattr(result, "conflict_pids", ()),
+            },
             "application_configured": bool(
                 getattr(self.application, "configured", True)
             ),

@@ -112,7 +112,7 @@ try {
         -Destination (Join-Path $distPath "Configurator.exe") -Force
     $readmePath = Join-Path $distPath "LEGACY-XP-README.txt"
     $readmeLines = @(
-        "Legacy package for Windows XP SP1 / Server 2003 / Windows 7 x86.",
+        "Legacy package for Windows XP / Server 2003 x86. See the published test matrix.",
         "",
         "Keep all files in this folder together. Do not copy only the EXE.",
         "Run RezhimKioska-V2-Legacy.exe from this folder.",

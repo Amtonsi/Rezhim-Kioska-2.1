@@ -26,8 +26,15 @@ class AppController(object):
                 self.effects.run(effect)
                 completed.append(effect)
         except Exception as error:
+            rolled_back = []
+            rollback_failures = []
             for effect in reversed(completed):
-                self.effects.rollback(effect)
+                try:
+                    self.effects.rollback(effect)
+                except Exception:
+                    rollback_failures.append(effect)
+                else:
+                    rolled_back.append(effect)
             self.machine.state = previous
             self._emit_audit(
                 "effect_failed",
@@ -36,14 +43,17 @@ class AppController(object):
                 transitionEvent=event,
                 failedEffect=failed_effect,
                 errorType=error.__class__.__name__,
-                rolledBackEffects=tuple(reversed(completed)),
+                rolledBackEffects=tuple(rolled_back),
+                rollbackFailures=tuple(rollback_failures),
             )
-            raise EffectExecutionError(
+            failure = EffectExecutionError(
                 "Effect failed: {0} ({1})".format(
                     failed_effect,
                     error.__class__.__name__,
                 )
             )
+            failure.original_error = error
+            raise failure
         self._emit_audit(
             "state_transition",
             level="Info",

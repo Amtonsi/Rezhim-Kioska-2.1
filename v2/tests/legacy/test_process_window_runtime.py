@@ -118,9 +118,14 @@ class PopenFactory(object):
 class TrackingProcessNative(NativeLegacyProcessApi):
     def __init__(self):
         self.closed = []
+        self.operator_identity = (b"operator", 1)
+        self.candidate_identity = self.operator_identity
         self.path = APP_PATH
         self.wait_result = 0x00000102
         self.query_error = None
+
+    def _process_identity(self, handle):
+        return self.candidate_identity
 
     def _open_process(self, pid, access):
         return 88
@@ -230,12 +235,13 @@ class LegacyProcessWindowRuntimeTests(unittest.TestCase):
             popen_factory=PopenFactory(),
         )
 
+        runtime.start(ApplicationSettings(APP_PATH))
         found = runtime.find_handoff(100, APP_PATH)
 
         self.assertEqual([200], [item.pid for item in found])
         self.assertEqual(FakeHandoffNative.HANDOFF_PATH, found[0].path)
 
-    def test_finds_new_same_name_broker_process_outside_launcher_tree(self):
+    def test_rejects_unrelated_new_same_name_process(self):
         native = FakeBrokerNative()
         runtime = LegacyProcessRuntime(
             native=native,
@@ -246,8 +252,7 @@ class LegacyProcessWindowRuntimeTests(unittest.TestCase):
         native.after_launch = True
         found = runtime.find_handoff(100, APP_PATH)
 
-        self.assertEqual([301], [item.pid for item in found])
-        self.assertEqual(FakeBrokerNative.NEW_PATH, found[0].path)
+        self.assertEqual([], found)
 
     def test_does_not_adopt_same_name_process_present_before_launch(self):
         native = FakeBrokerNative()
@@ -260,6 +265,20 @@ class LegacyProcessWindowRuntimeTests(unittest.TestCase):
         found = runtime.find_handoff(100, APP_PATH)
 
         self.assertEqual([], found)
+
+    def test_process_with_same_basename_in_unrelated_directory_is_not_adopted(self):
+        native = FakeBrokerNative()
+        native.after_launch = True
+        runtime = LegacyProcessRuntime(native=native, popen_factory=PopenFactory())
+        self.assertEqual([], runtime.find_by_exact_path(APP_PATH))
+        self.assertEqual([], runtime.find_handoff(999, APP_PATH))
+
+    def test_liveness_requires_current_user_and_session(self):
+        native = TrackingProcessNative()
+        for other_identity in ((b"another_user", 1), (b"operator", 2)):
+            native.candidate_identity = other_identity
+            self.assertFalse(native.is_process_running(10, APP_PATH))
+        self.assertEqual([88, 88], native.closed)
 
     def test_snapshot_failure_does_not_prevent_allowed_application_start(self):
         factory = PopenFactory()

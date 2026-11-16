@@ -22,7 +22,7 @@
     "keyboardGuardRequired": true
   },
   "logging": {
-    "logDirectory": "C:\\ProgramData\\Kiosk\\Logs",
+    "logDirectory": "%LOCALAPPDATA%\\RezhimKioska\\Logs",
     "level": "Info",
     "maxBytes": 1048576,
     "backupCount": 5

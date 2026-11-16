@@ -277,6 +277,16 @@ class InstallServiceTests(unittest.TestCase):
                     )
             self.assertNotIn("save_backup", calls)
 
+    def test_repeat_install_keeps_original_backup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, calls, app_path = self.make_fixture(directory)
+            service.backup_store.path = os.path.join(directory, "backup.json")
+            service.apply(config_for(app_path), service.launcher_path)
+            with open(service.backup_store.path, "wb") as stream:
+                stream.write(b"initial backup")
+            service.apply(config_for(app_path), service.launcher_path)
+            self.assertEqual(1, calls.count("save_backup"))
+
     def test_repair_reapplies_configuration_without_replacing_original_backup(self):
         with tempfile.TemporaryDirectory() as directory:
             service, calls, app_path = self.make_fixture(directory)

@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import os
+import importlib
 import sys
 import unittest
 
@@ -29,6 +30,32 @@ def all_text(scene):
 
 
 class OperatorSceneTests(unittest.TestCase):
+    def test_runtime_states_reach_the_operator_scene(self):
+        cases = [
+            ("start_failed", "Ошибка запуска", "OSError"),
+            ("crash_loop", "Частые сбои", "4"),
+            ("conflict", "Конфликт", "123, 456"),
+            ("waiting_restart", "Перезапуск", "следующей попытки"),
+            ("waiting_handoff", "Ожидание", "основной процесс"),
+            ("stopped", "Без надзора", "наблюдение"),
+        ]
+        class App(object):
+            enabled = True
+        for family, build in zip(("modern", "legacy"), SCENE_BUILDERS):
+            package = "kiosk_v2_" + family
+            session_type = importlib.import_module(package + ".app.session").LauncherSession
+            result_type = importlib.import_module(package + ".app.application_runtime").ApplicationRuntimeResult
+            app = App()
+            session = session_type(None, None, app, None, None, None, None, None, None, 60)
+            for status, label, detail in cases:
+                app.latest_result = result_type(status, error_code="OSError", conflict_pids=(123, 456), failure_count=4)
+                items = by_name(build(**session.model()))
+                self.assertEqual(label, items["application_status"]["text"])
+                self.assertIn(detail, items["application_hint"]["text"])
+                self.assertNotIn("restore_application_button", items)
+            app.latest_result = result_type("adopted", pid=123, window_status="minimized")
+            self.assertIn("restore_application_button", by_name(build(**session.model())))
+
     def test_operator_scene_has_exact_brand_status_and_unlock_action(self):
         for build in SCENE_BUILDERS:
             scene = build(r"C:\Windows\System32\notepad.exe")
@@ -132,7 +159,7 @@ class OperatorSceneTests(unittest.TestCase):
             )
             self.assertNotIn("Защита ограничена", normal_text)
             self.assertIn("Защита ограничена", degraded_text)
-            self.assertIn("Explorer обнаружен", degraded_text)
+            self.assertIn("Киоск обнаружил Explorer", degraded_text)
 
     def test_all_scene_rectangles_stay_inside_design_surface(self):
         for build in SCENE_BUILDERS:

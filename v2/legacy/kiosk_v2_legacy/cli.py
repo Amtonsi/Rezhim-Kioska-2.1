@@ -2,16 +2,19 @@
 from __future__ import unicode_literals
 
 import argparse
+import sys
 
 
 class KioskCli(object):
     def __init__(self, install_service, restore_service, config_loader,
-                 recovery_api=None, test_runner=None):
+                 recovery_api=None, test_runner=None, config_path=None, launcher_command=None):
         self.install_service = install_service
         self.restore_service = restore_service
         self.config_loader = config_loader
         self.recovery_api = recovery_api
-        self.test_runner = test_runner or (lambda: None)
+        self.test_runner = test_runner
+        self.config_path = config_path
+        self.launcher_command = launcher_command
 
     def run(self, argv):
         args = self._parser().parse_args(argv)
@@ -27,6 +30,9 @@ class KioskCli(object):
                     result = self.install_service.apply(
                         config, args.launcher_command, dry_run=dry_run
                     )
+                if dry_run:
+                    for operation in getattr(result, "operation_ids", ()):
+                        print(operation)
                 return 0 if result.succeeded else 3
             if args.command == "restore":
                 if not args.apply:
@@ -43,7 +49,8 @@ class KioskCli(object):
                 return 0
             if args.command == "test-mode":
                 return self._run_test_mode(args)
-        except Exception:
+        except Exception as error:
+            sys.stderr.write("kiosk-v2: {0!r}\n".format(error))
             return 2
         return 2
 
@@ -54,6 +61,8 @@ class KioskCli(object):
                 config, args.launcher_command, dry_run=True
             )
             return 0 if result.succeeded else 3
+        if self.test_runner is None:
+            raise ValueError("interactive test-mode requires a test runner")
         failed = False
         restored = None
         try:
@@ -75,14 +84,13 @@ class KioskCli(object):
             failed = True
         return 2 if failed else 0
 
-    @staticmethod
-    def _parser():
+    def _parser(self):
         parser = argparse.ArgumentParser(prog="kiosk-v2-legacy")
         commands = parser.add_subparsers(dest="command")
         for name in ("install", "repair", "dry-run", "test-mode"):
             command = commands.add_parser(name)
-            command.add_argument("--config", required=True)
-            command.add_argument("--launcher-command", required=True)
+            command.add_argument("--config", default=self.config_path, required=self.config_path is None)
+            command.add_argument("--launcher-command", default=self.launcher_command, required=self.launcher_command is None)
             command.add_argument("--apply", action="store_true")
         for name in ("restore", "uninstall", "recover-desktop"):
             command = commands.add_parser(name)

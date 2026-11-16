@@ -12,7 +12,7 @@ a = Analysis(
     [entrypoint],
     pathex=[package_root],
     binaries=[],
-    datas=[],
+    datas=[(os.path.join(project_root, "v2", "contracts", "kiosk-config-v2.schema.json"), "contracts")],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],

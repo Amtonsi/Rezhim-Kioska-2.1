@@ -5,6 +5,8 @@ import ntpath
 import os
 import tempfile
 
+from kiosk_v2_modern.platform.log_path import PROFILE_LOG_DIRECTORY
+
 
 class ConfigValidationError(ValueError):
     def __init__(self, path, code):
@@ -102,7 +104,7 @@ class ConfigValidator(object):
             )
 
         log_directory = data["logging"]["logDirectory"].strip()
-        if not ntpath.isabs(log_directory):
+        if log_directory != PROFILE_LOG_DIRECTORY and not ntpath.isabs(log_directory):
             raise ConfigValidationError(
                 "$.logging.logDirectory",
                 "absolute_path_required",

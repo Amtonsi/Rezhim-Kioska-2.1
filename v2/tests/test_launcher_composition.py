@@ -66,6 +66,14 @@ class FakeDpi(object):
         self.calls.append("dpi")
 
 
+class FakeOperatorGuard(object):
+    def __init__(self, calls):
+        self.calls = calls
+
+    def validate(self, user):
+        self.calls.append(("operator_guard", user))
+
+
 class FakeRoot(object):
     def __init__(self, calls):
         self.calls = calls
@@ -339,11 +347,13 @@ class BootstrapTests(unittest.TestCase):
                 FakeDpi(calls),
                 root_factory,
                 session_factory,
+                FakeOperatorGuard(calls),
             )
             bootstrap.run()
             self.assertEqual(
                 [
                     ("config", False),
+                    ("operator_guard", "test"),
                     ("settings", "test"),
                     "dpi",
                     "tk",
@@ -532,7 +542,6 @@ class BootstrapTests(unittest.TestCase):
 
             self.assertEqual(
                 [
-                    ("Restore.exe", 'recover-desktop --apply'),
                     ("Configurator.exe", 'configure-application'),
                 ],
                 api.calls,

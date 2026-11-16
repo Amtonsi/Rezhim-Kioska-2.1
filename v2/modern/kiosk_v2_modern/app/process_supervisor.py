@@ -8,7 +8,12 @@ HANDOFF_GRACE_SECONDS = 5.0
 def normalize_executable_path(path):
     if not isinstance(path, str) or not path.strip():
         raise ValueError("Application path is required")
-    return ntpath.normcase(ntpath.normpath(path.strip()))
+    normalized = ntpath.normcase(ntpath.normpath(path.strip()))
+    if normalized.startswith("\\\\?\\unc\\"):
+        return "\\\\" + normalized[8:]
+    if normalized.startswith("\\\\?\\"):
+        return normalized[4:]
+    return normalized
 
 
 class ApplicationSettings(object):
@@ -93,6 +98,8 @@ class ProcessSupervisor(object):
     def __init__(self, settings, process_api, clock):
         self.settings = settings
         self.process_api = process_api
+        resolver = getattr(process_api, "resolve_configured_path", None)
+        self._configured_image_path = resolver(settings.path) if resolver else settings.path
         self.clock = clock
         self._enabled = False
         self._pid = None
@@ -136,7 +143,7 @@ class ProcessSupervisor(object):
         discovery = self._discover_existing()
         if discovery is not None:
             return discovery
-        discovery = self._discover_existing_by_name()
+        discovery = self._discover_existing_broker()
         if discovery is not None:
             return discovery
         return self._launch("started")
@@ -170,7 +177,7 @@ class ProcessSupervisor(object):
         discovery = self._discover_existing()
         if discovery is not None:
             return discovery
-        discovery = self._discover_existing_by_name()
+        discovery = self._discover_existing_broker()
         if discovery is not None:
             return discovery
 
@@ -215,7 +222,7 @@ class ProcessSupervisor(object):
         if discovery is not None:
             self._restart_due_at = None
             return discovery
-        discovery = self._discover_existing_by_name()
+        discovery = self._discover_existing_broker()
         if discovery is not None:
             self._restart_due_at = None
             return discovery
@@ -243,9 +250,9 @@ class ProcessSupervisor(object):
         )
 
     def _discover_existing(self):
-        expected = normalize_executable_path(self.settings.path)
+        expected = normalize_executable_path(self._configured_image_path)
         candidates = []
-        for process in self.process_api.find_by_exact_path(self.settings.path):
+        for process in self.process_api.find_by_exact_path(self._configured_image_path):
             try:
                 exact_path = normalize_executable_path(process.path) == expected
             except (TypeError, ValueError):
@@ -253,7 +260,7 @@ class ProcessSupervisor(object):
             if (
                 exact_path
                 and process.running
-                and self.process_api.is_running(process.pid, self.settings.path)
+                and self.process_api.is_running(process.pid, self._configured_image_path)
             ):
                 candidates.append(process)
 
@@ -278,8 +285,8 @@ class ProcessSupervisor(object):
         self._conflict_pids = ()
         return None
 
-    def _discover_existing_by_name(self):
-        finder = getattr(self.process_api, "find_existing_by_name", None)
+    def _discover_existing_broker(self):
+        finder = getattr(self.process_api, "find_existing_broker", None)
         if finder is None:
             return None
         try:
@@ -316,7 +323,7 @@ class ProcessSupervisor(object):
     def _tracked_process_is_running(self):
         return self._pid is not None and self.process_api.is_running(
             self._pid,
-            self._runtime_path or self.settings.path,
+            self._runtime_path or self._configured_image_path,
         )
 
     def _discover_handoff(self, parent_pid):
@@ -395,12 +402,12 @@ class ProcessSupervisor(object):
                 self.settings.path
             ):
                 raise ValueError("Started process path does not match configuration")
-            if not self.process_api.is_running(process.pid, self.settings.path):
+            if not self.process_api.is_running(process.pid, self._configured_image_path):
                 discovery = self._discover_existing()
                 if discovery is not None:
                     self._restart_due_at = None
                     return discovery
-                discovery = self._discover_existing_by_name()
+                discovery = self._discover_existing_broker()
                 if discovery is not None:
                     self._restart_due_at = None
                     return discovery
@@ -440,7 +447,7 @@ class ProcessSupervisor(object):
             )
 
         self._pid = process.pid
-        self._runtime_path = process.path
+        self._runtime_path = self._configured_image_path
         self._restart_due_at = None
         self._conflict_pids = ()
         self._tracked_since = self._now()

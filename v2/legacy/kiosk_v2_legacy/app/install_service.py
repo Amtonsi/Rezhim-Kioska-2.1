@@ -28,12 +28,14 @@ class InstallResult(object):
 
 class InstallService(object):
     def __init__(self, preflight, profile_locator, registry_factory, acl_manager,
-                 artifacts, backup_store, install_directory, launcher_path, config_path):
+                 artifacts, backup_store, install_directory, launcher_path, config_path,
+                 protect_allowed_app=True):
         self.preflight = preflight
         self.profile_locator = profile_locator
         self.registry_factory = registry_factory
         self.acl_manager = acl_manager
         self.artifacts = artifacts
+        self.protect_allowed_app = protect_allowed_app
         self.backup_store = backup_store
         self.install_directory = self._normalize(install_directory)
         self.launcher_path = self._normalize(launcher_path)
@@ -57,6 +59,8 @@ class InstallService(object):
         profile = self.profile_locator.get_profile_path(identity.sid)
         operation_ids = self._operation_ids(allowed)
         if dry_run:
+            if not save_backup or os.path.exists(self.backup_store.path):
+                self.backup_store.load("legacy", identity.sid)
             return InstallResult(operation_ids, True, True)
         registry = self.registry_factory(identity.sid, profile)
         policy_snapshots = [
@@ -79,7 +83,7 @@ class InstallService(object):
             "fileAcls": [item.to_dict() for item in acl_snapshots],
             "configBackup": artifact_snapshot,
         }
-        if save_backup:
+        if save_backup and not os.path.exists(self.backup_store.path):
             self.backup_store.save(metadata)
         self.backup_store.load("legacy", identity.sid)
 
@@ -152,7 +156,7 @@ class InstallService(object):
             ("launcher", self.launcher_path, True),
             ("config", self.config_path, False),
         ]
-        if self._inside(allowed):
+        if self.protect_allowed_app and self._inside(allowed):
             result.append(("allowed_application", allowed, True))
         unique = []
         seen = set()

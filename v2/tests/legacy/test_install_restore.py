@@ -238,7 +238,7 @@ class LegacyInstallRestoreTests(unittest.TestCase):
         protected = manager.protect_for_operator(
             path, "S-1-5-21-1-2-3-1001", execute=True
         )
-        self.assertIn("GRGX;;;S-1-5-21-1-2-3-1001", protected)
+        self.assertIn("0x1200a9;;;S-1-5-21-1-2-3-1001", protected)
         manager.restore(snapshot)
         self.assertTrue(manager.verify_snapshot(snapshot))
 
@@ -323,6 +323,12 @@ class LegacyInstallRestoreTests(unittest.TestCase):
         self.assertTrue(installed.succeeded)
         self.assertEqual("set_operator_shell", installed.operation_ids[-1])
         self.assertTrue(os.path.isfile(launcher))
+        with open(backup.path, "rb") as stream:
+            original = stream.read()
+        self.assertTrue(service.apply(config, '"{0}"'.format(launcher)).succeeded)
+        self.assertTrue(service.repair(config, '"{0}"'.format(launcher)).succeeded)
+        with open(backup.path, "rb") as stream:
+            self.assertEqual(original, stream.read())
         restored = RestoreService(
             backup, OperatorPreflight(preflight), profile_locator,
             registry_factory, acl, artifacts
@@ -331,6 +337,34 @@ class LegacyInstallRestoreTests(unittest.TestCase):
         self.assertTrue(restored.succeeded)
         self.assertFalse(os.path.exists(launcher))
         self.assertFalse(os.path.exists(config_path))
+
+
+class NativeHiveUnloadTests(unittest.TestCase):
+    def test_only_owned_hives_are_unloaded_and_errors_preserve_ownership(self):
+        from kiosk_v2_legacy.platform.operator_registry import WindowsRegistryApi, winreg
+
+        class Native(object):
+            def __init__(self):
+                self.calls = []
+                self.status = 5
+
+            def RegUnLoadKeyW(self, parent, name):
+                self.calls.append((parent, name))
+                return self.status
+
+        native = Native()
+        api = WindowsRegistryApi.__new__(WindowsRegistryApi)
+        api.advapi32 = native
+        api.loaded_roots = set(("KioskV2_test",))
+        api.unmount_operator_hive("already_logged_in")
+        self.assertEqual([], native.calls)
+        with self.assertRaises(OSError):
+            api.unmount_operator_hive("KioskV2_test")
+        self.assertIn("KioskV2_test", api.loaded_roots)
+        native.status = 0
+        api.unmount_operator_hive("KioskV2_test")
+        self.assertEqual([(winreg.HKEY_USERS, "KioskV2_test")] * 2, native.calls)
+        self.assertFalse(api.loaded_roots)
 
 
 if __name__ == "__main__":

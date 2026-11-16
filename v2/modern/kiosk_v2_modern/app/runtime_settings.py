@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from kiosk_v2_modern.app.process_supervisor import ApplicationSettings
+from kiosk_v2_modern.platform.log_path import resolve_log_directory
 
 
 SENSITIVE_KEY_PARTS = (
@@ -135,7 +136,7 @@ class RuntimeSettingsFactory(object):
         )
         log_data = config["logging"]
         logging_settings = LoggingSettings(
-            log_data["logDirectory"],
+            resolve_log_directory(log_data["logDirectory"]),
             log_data["level"],
             log_data["maxBytes"],
             log_data["backupCount"],

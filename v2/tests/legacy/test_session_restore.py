@@ -15,6 +15,7 @@ from kiosk_v2_legacy.app.controller import AppController
 from kiosk_v2_legacy.app.effects import RuntimeEffects
 from kiosk_v2_legacy.app.session import LauncherSession
 from kiosk_v2_legacy.domain.state_machine import StateMachine
+from kiosk_v2_legacy.platform.desktop_isolation import IsolationResult
 from kiosk_v2_legacy.ui.tk_view import KioskCanvasView
 
 
@@ -94,6 +95,17 @@ class Restore(object):
         return True
 
 
+class OperatorRecovery(object):
+    def __init__(self):
+        self.calls = []
+
+    def restore_shell_surfaces(self):
+        self.calls.append("surfaces")
+
+    def start_explorer(self):
+        self.calls.append("explorer")
+
+
 class Clock(object):
     def monotonic(self): return 0.0
 
@@ -126,13 +138,29 @@ class SessionRestoreTests(unittest.TestCase):
             keyboard=keyboard,
             view=view,
             auth=None,
-            recovery=None,
+            recovery=OperatorRecovery(),
             clock=Clock(),
             admin_timeout_seconds=300,
             restore_action=restore,
             change_application=change_application,
         )
+        session.running = True
         return session, root, application, view
+
+    def test_reappearing_explorer_keeps_warning_between_enforcement_ticks(self):
+        session = self.build_session(Restore())[0]
+        session.running = True
+        result = IsolationResult(terminated_pids=(123,))
+        session.desktop.tick = lambda: result
+        session.tick()
+        self.assertTrue(session.model()["isolation_degraded"])
+        session.desktop.tick = lambda: None
+        session.tick()
+        self.assertTrue(session.model()["isolation_degraded"])
+        session.handle_action("returnToKiosk")
+        self.assertFalse(session.model()["isolation_degraded"])
+        session.tick()
+        self.assertFalse(session.model()["isolation_degraded"])
 
     def test_restore_failure_keeps_admin_session_and_buttons_available(self):
         session, root, application, view = self.build_session(
@@ -142,6 +170,8 @@ class SessionRestoreTests(unittest.TestCase):
         session.handle_action("restore")
 
         self.assertEqual("ADMIN_SESSION", session.controller.state)
+        self.assertTrue(session.running)
+        self.assertEqual([], session.recovery.calls)
         self.assertFalse(root.destroyed)
         self.assertEqual(1, application.resume_calls)
         self.assertIn("restore_error", view.calls)
@@ -153,6 +183,10 @@ class SessionRestoreTests(unittest.TestCase):
         session.handle_action("restore")
 
         self.assertEqual(1, restore.calls)
+        self.assertEqual(["surfaces", "explorer"], session.recovery.calls)
+        self.assertFalse(session.running)
+        session.close()
+        self.assertEqual(["surfaces", "explorer"], session.recovery.calls)
         self.assertEqual("STOPPED", session.controller.state)
         self.assertTrue(root.destroyed)
         self.assertIn("restore_result", view.calls)

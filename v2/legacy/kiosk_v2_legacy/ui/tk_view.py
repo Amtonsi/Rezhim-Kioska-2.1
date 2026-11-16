@@ -349,7 +349,8 @@ class KioskCanvasView(object):
         model = dict(self.model_provider() or {})
         scene = build_operator_scene(
             model.get("application_path", ""),
-            app_status=model.get("app_status", "running"),
+            app_status=model.get("app_status", "pending"),
+            app_diagnostics=model.get("app_diagnostics"),
             application_configured=model.get("application_configured", True),
             admin_session_active=self.admin_session_active,
             supervision_enabled=model.get("supervision_enabled", True),
@@ -363,7 +364,9 @@ class KioskCanvasView(object):
         self.refresh()
 
     def _dispatch(self, action):
-        self.action_handler(action)
+        # A command can destroy the canvas or redraw its tags. Wait until Tk
+        # has finished dispatching the current mouse binding.
+        self.root.after_idle(self.action_handler, action)
 
     def _on_shell_click(self, _event):
         if self._current_item_is_action():

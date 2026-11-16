@@ -80,13 +80,13 @@ class AdminActionTests(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.directory, ignore_errors=True)
 
-    def test_manual_run_without_backup_recovers_desktop_and_reports_success(self):
+    def test_manual_run_without_backup_needs_no_elevated_child(self):
         api = FakeAdminApi([0])
         action = AdminActionLauncher(self.restore, self.configurator, api=api)
 
         self.assertTrue(action.run())
         self.assertEqual(
-            [(self.restore, "recover-desktop --apply")],
+            [],
             api.calls,
         )
 
@@ -94,14 +94,13 @@ class AdminActionTests(unittest.TestCase):
         state = os.path.join(self.directory, "state")
         os.makedirs(state)
         open(os.path.join(state, "backup-v2.json"), "wb").close()
-        api = FakeAdminApi([0, 0])
+        api = FakeAdminApi([0])
         action = AdminActionLauncher(self.restore, self.configurator, api=api)
 
         self.assertTrue(action.run())
         self.assertEqual(
             [
                 (self.restore, "restore --apply"),
-                (self.restore, "recover-desktop --apply"),
             ],
             api.calls,
         )
