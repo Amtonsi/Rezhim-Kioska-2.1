@@ -1,0 +1,8 @@
+launcher_sha256=a2eeb4bcd1eb38c08463153adce1204b52a89de2cee6504b0b62f8827dc08707
+before={'explorer': 1528}
+kiosk={'rezhimkioska-v2-legacy': 1404, 'notepad': 1228}
+watchdog={'rezhimkioska-v2-legacy': 1404, 'notepad': 1920}
+exit=GUI_EXIT_CODE=0
+after={'notepad': 1920, 'explorer': 620}
+restore_button_gui_sha256=a2eeb4bcd1eb38c08463153adce1204b52a89de2cee6504b0b62f8827dc08707
+restore_button_gui_exit=0

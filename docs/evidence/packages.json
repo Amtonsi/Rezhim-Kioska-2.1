@@ -1,0 +1,44 @@
+[
+  {
+    "package": "RezhimKioska-2.1.0-Windows10-11-x64.exe",
+    "sfx_extract": "ok",
+    "zip_matches_sfx": true,
+    "files": {
+      "RezhimKioska-V2-Modern.exe": "7c078664e33784afe56e33470e6b85d351dd01be1212440368fc4f862eb667b4",
+      "Restore.exe": "701963c8e03242e9d4ccd3ed49ce5c0c28d5f79434bfd6affd4f27383edf1bcd",
+      "Configurator.exe": "a243cdc6f7a45691931cec44a1e74860c9254526b4b2412c8e4dfadafb32cb1a"
+    },
+    "host_win11": {
+      "--platform-check": 0,
+      "--check-config": 0
+    }
+  },
+  {
+    "package": "RezhimKioska-2.1.0-Windows7-Compat-x86.exe",
+    "sfx_extract": "ok",
+    "zip_matches_sfx": true,
+    "files": {
+      "RezhimKioska-V2-Modern.exe": "5841054245243555b68db47705c2d30c443daca369deeca6fae84e7767c4d4bb",
+      "Restore.exe": "e837f025727c8ce79b810e8b22d316eb5b78e492c037468b5058e38bb3978484",
+      "Configurator.exe": "ac77dc2930e0f304c2f5e49f20dc1750ea41b80ade0aa82997532579e5519055"
+    },
+    "host_win11": {
+      "--platform-check": 0,
+      "--check-config": 0
+    }
+  },
+  {
+    "package": "RezhimKioska-2.1.0-WindowsXP-Legacy-x86.exe",
+    "sfx_extract": "ok",
+    "zip_matches_sfx": true,
+    "files": {
+      "RezhimKioska-V2-Legacy.exe": "a2eeb4bcd1eb38c08463153adce1204b52a89de2cee6504b0b62f8827dc08707",
+      "Restore.exe": "d39667ec6921587fdb61ff898b3bad3186db4097d3ca04107e0f76a0906ad570",
+      "Configurator.exe": "b9e69ab388c90abd680a851e1f55a4fc2d1686560c9e0380b3098b2d15c9ef71"
+    },
+    "host_win11": {
+      "--platform-check": 4,
+      "--check-config": 4
+    }
+  }
+]

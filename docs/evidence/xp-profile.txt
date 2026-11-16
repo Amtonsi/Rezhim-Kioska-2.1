@@ -1,0 +1,19 @@
+before-install AuditKioskAdm Shell=<absent> DisableTaskMgr=<absent> | AuditKioskOp Shell=<absent> DisableTaskMgr=<absent> | BackupExists=NO
+platform=0
+config=0
+dry-run=0
+before-install AuditKioskAdm Shell=<absent> DisableTaskMgr=<absent> | AuditKioskOp Shell=<absent> DisableTaskMgr=<absent> | BackupExists=NO
+dry-run=0
+install=0
+after-install AuditKioskAdm Shell=<absent> DisableTaskMgr=<absent> | AuditKioskOp Shell="C:\KioskFinal\RezhimKioska-V2-Legacy.exe" DisableTaskMgr=1 | BackupExists=YES
+operator_login_kiosk={'rezhimkioska-v2-legacy': 1796, 'notepad': 2008}
+operator_login_kiosk={'rezhimkioska-v2-legacy': 1796, 'notepad': 2008}
+sfx_sha256=6b1a376e2fcd37cd0db55181e2bbb5bbef5e255a2844fadecc4345ca0e9d8767
+sfx_exit=0
+platform_sha256=a2eeb4bcd1eb38c08463153adce1204b52a89de2cee6504b0b62f8827dc08707
+platform_exit=0
+config_sha256=a2eeb4bcd1eb38c08463153adce1204b52a89de2cee6504b0b62f8827dc08707
+config_exit=0
+restore=0
+after-restore AuditKioskAdm Shell=<absent> DisableTaskMgr=<absent> | AuditKioskOp Shell=<absent> DisableTaskMgr=<absent> | BackupExists=YES
+reboot_restored={'explorer': 1528}

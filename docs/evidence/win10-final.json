@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-16",
+  "os": "Windows 10 Education 22H2 19045.6456 x64",
+  "platform": "VMware Workstation, disposable copy",
+  "sfxSha256": "2857a50fe5c32d0810f43c6a382b56559bccf9658b6a772a1c5e7d55ea525d16",
+  "launcherSha256": "7c078664e33784afe56e33470e6b85d351dd01be1212440368fc4f862eb667b4",
+  "manifestFiles": 13,
+  "initialApplicationConfigured": false,
+  "notepadPidBefore": 3892,
+  "notepadPidAfter": 2164,
+  "states": {
+    "restored": {
+      "shell": null,
+      "registryCount": 10,
+      "allInitialValuesRestored": true,
+      "processes": [
+        {
+          "name": "notepad.exe",
+          "pid": 2164,
+          "user": "AuditKioskOp"
+        },
+        {
+          "name": "explorer.exe",
+          "pid": 4012,
+          "user": "AuditKioskOp"
+        }
+      ]
+    },
+    "installed": {
+      "shell": "\"C:\\Program Files\\Kiosk QA x64\\RezhimKioska-V2-Modern.exe\"",
+      "registryCount": 10,
+      "allInitialValuesRestored": false,
+      "processes": [
+        {
+          "name": "RezhimKioska-V2-Modern.exe",
+          "pid": 3276,
+          "user": "AuditKioskOp"
+        },
+        {
+          "name": "RezhimKioska-V2-Modern.exe",
+          "pid": 2176,
+          "user": "AuditKioskOp"
+        },
+        {
+          "name": "notepad.exe",
+          "pid": 3892,
+          "user": "AuditKioskOp"
+        }
+      ]
+    },
+    "next-login": {
+      "shell": null,
+      "registryCount": 10,
+      "allInitialValuesRestored": true,
+      "processes": [
+        {
+          "name": "explorer.exe",
+          "pid": 1796,
+          "user": "AuditKioskOp"
+        }
+      ]
+    }
+  },
+  "newAppCrashReports": 0,
+  "replayedReports": 2,
+  "vmStopped": true
+}
