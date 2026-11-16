@@ -19,21 +19,35 @@ $targets = @(
     "legacy\Restore-V2-Legacy.exe",
     "legacy\Configurator-V2-Legacy.exe"
 )
-$lines = @()
-foreach ($relativePath in $targets) {
-    $path = Join-Path $distRoot $relativePath
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        continue
+# A single checkout can build several targets at once. Serialize the shared manifest.
+$manifestLock = New-Object System.Threading.Mutex($false, 'Local\RezhimKioska.Build.Manifest')
+$acquired = $false
+try {
+    try {
+        $acquired = $manifestLock.WaitOne(60000)
+    } catch [System.Threading.AbandonedMutexException] {
+        $acquired = $true
     }
-    $item = Get-Item -LiteralPath $path
-    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
-    $portablePath = $relativePath.Replace("\", "/")
-    $lines += "${hash}  ${portablePath}  bytes=$($item.Length)"
-}
+    if (-not $acquired) { throw "Timed out waiting for the build manifest" }
+    $lines = @()
+    foreach ($relativePath in $targets) {
+        $path = Join-Path $distRoot $relativePath
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            continue
+        }
+        $item = Get-Item -LiteralPath $path
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+        $portablePath = $relativePath.Replace("\", "/")
+        $lines += "${hash}  ${portablePath}  bytes=$($item.Length)"
+    }
 
-$encoding = New-Object System.Text.UTF8Encoding($false)
-[IO.File]::WriteAllLines(
-    (Join-Path $distRoot "SHA256SUMS.txt"),
-    $lines,
-    $encoding
-)
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllLines(
+        (Join-Path $distRoot "SHA256SUMS.txt"),
+        $lines,
+        $encoding
+    )
+} finally {
+    if ($acquired) { $manifestLock.ReleaseMutex() }
+    $manifestLock.Dispose()
+}
